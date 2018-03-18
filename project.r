@@ -1,4 +1,4 @@
-                
+# Download data                
 
 data_full = read.csv("AmesHousing.csv", header=TRUE, sep = ";")
 
