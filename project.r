@@ -1,4 +1,4 @@
-##### 1. Loading Dataset #####
+##### 1. Loading Dataset. #####
 
 data_full = read.csv("AmesHousing.csv", header=TRUE, sep = ";")
 
@@ -106,7 +106,7 @@ data_full<-transform(data_full, Pool.QC=fct_explicit_na(Pool.QC, "None"))
 
 sum(is.na(data_full$Misc.Feature))
 
-# As was mentioned above  NA stands for no "Miscellaneous feature". That´s why I am going to change NAs for "None" and set to a level:
+# As was mentioned above  NA stands for no "Miscellaneous feature". That?s why I am going to change NAs for "None" and set to a level:
 
 data_full<-transform(data_full, Misc.Feature=fct_explicit_na( Misc.Feature, "None"))
 
@@ -134,7 +134,7 @@ data_full<-transform(data_full, Fence=fct_explicit_na( Fence, "None"))
 sum(is.na(data_full$Fireplace.Qu))
 
 # With 1164 NAs that stand for "no_fireplace". 
-# Before doing anything let´s see if the number of properties
+# Before doing anything let?s see if the number of properties
 # with 0 or no fireplace coinsides with the number of NAs in Fireplace.Qu, using Fireplaces which stands for number of fireplaces.
 
 sum(is.na(data_full$Fireplace.Qu)) == length(which(data_full$Fireplaces== 0)) # they are the same;
@@ -156,7 +156,7 @@ min(data_full$Lot.Frontage, na.rm = TRUE)
 
 data_full$Lot.Frontage[is.na(data_full$Lot.Frontage)] <- 0
 
-# Let´s take a look at the 5 "garage" group variables: Garage.Yr.Blt, Garage.Type, Garage.Qual,
+# Let?s take a look at the 5 "garage" group variables: Garage.Yr.Blt, Garage.Type, Garage.Qual,
 # Garage.Finish, Garage.Cond, Garage.Area, Garage.Cars. Almost all of them have different number of NAs.
 
 sum(is.na(data_full$Garage.Yr.Blt)) # with 117 NAs
@@ -216,7 +216,7 @@ data_full<-transform(data_full, Bsmt.Qual=fct_explicit_na(Bsmt.Qual, "None"))
 data_full<-transform(data_full, Bsmt.Cond=fct_explicit_na(Bsmt.Cond, "None"))
 data_full<-transform(data_full, Bsmt.Exposure=fct_explicit_na(Bsmt.Exposure, "None"))
 
-# The last variable with 11 NAs is Mas.Vnr.Area - the  masonry veneer area. It doesn´t say that NAs stand for no veneer area, so we leave it as
+# The last variable with 11 NAs is Mas.Vnr.Area - the  masonry veneer area. It doesn?t say that NAs stand for no veneer area, so we leave it as
 # it is for now.
 
 sum(is.na(data_full$Mas.Vnr.Area)) 
