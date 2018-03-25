@@ -29,7 +29,7 @@ glimpse(data_full)
 
 # Overall.Qual and Overall. Cond are ratings and can only take on a finite number of values. 
 # Therefore I am going to change them to factors.
-
+data_full$MS.SubClass=as.factor(data_full$MS.SubClass)
 data_full$Overall.Qual=as.factor(data_full$Overall.Qual)
 data_full$Overall.Cond=as.factor(data_full$Overall.Cond)
 
@@ -40,21 +40,26 @@ data_full$Overall.Cond=as.factor(data_full$Overall.Cond)
 ggplot(data = data_full, aes(x = Gr.Liv.Area, y =SalePrice, colour=Sale.Condition))+ geom_jitter(size=1)+
   scale_y_continuous(name = "Sale Price",labels = function(y) paste0(y / 1000, "k"))
 
+
 # Three of them with the living area bigger than 4500 square feet (418.0636 square meters) sold at low prices of less than $200 000.
 # They were also were sold partially that might not represent true market values.
 
 which(data_full$Gr.Liv.Area>4000 & data_full$SalePrice<200000) # 1499 2181 2182
 
-# The other two are just unusual sales with very large houses and quite appropriate prices. One of them was sold under abnormal sale 
+# The other two are just unusual sales. Very large houses and quite appropriate prices. One of them was sold under abnormal sale 
 # conditions.
 
 which(data_full$Gr.Liv.Area>4000 & data_full$SalePrice>650000) # 1761 1768
 
-# For my further analysis I will remove any houses larger than 4000 square feet from the 
-# data set and leave those that were sold under "Normal" sale condition only.
+# For my further analysis I will remove any houses with above grade (ground) living area  larger 
+# than 4000 square feet from the data set and leave those that were sold under "Normal" sale condition only.
 
 data_full <- data_full %>% filter(Sale.Condition == "Normal" & Gr.Liv.Area < 4001 )
 
+# Lot area????
+
+ggplot(data = data_full, aes(x = Lot.Area, y =Gr.Liv.Area))+ geom_jitter(size=1)
+data_full <- data_full %>% filter(Sale.Condition == "Normal" & Lot.Area < 100000)
 ##### 5. Treating NAs. #####
 
 summary(data_full)
@@ -208,6 +213,7 @@ base_data<-data_full[basement_col]
 
 nrow(base_data[is.na(base_data$BsmtFin.Type.1) & is.na(base_data$BsmtFin.Type.2) & is.na(base_data$Bsmt.Qual)
                & is.na(base_data$Bsmt.Cond) & is.na(base_data$Bsmt.Exposure),]) # 67 cases
+
 # And convert these NAs to "None"
 
 data_full<-transform(data_full, BsmtFin.Type.1=fct_explicit_na(BsmtFin.Type.1, "None"))
