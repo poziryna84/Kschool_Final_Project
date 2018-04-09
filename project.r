@@ -643,22 +643,4 @@ ggpairs(data_full, columns = c("SalePrice","Total.Bsmt.SF", "BsmtFin.SF.1", "Bsm
 drops_1 <- c("BsmtFin.SF.1")
 data_full<-data_full[ , !(names(data_full) %in% drops_1)]
 
-data_full$Garage.Area
-str(data_full$X1st.Flr.SF)
-sum(is.na(data_full$Full.Bath))
-# TotRmsAbvGrd	(Discrete) -TotRms.AbvGrd
-# , "X1st.Flr.SF", "X2nd.Flr.SF", "Low.Qual.Fin.SF", "Bsmt.Full.Bath", "Bsmt.Half.Bath",
-# "Full.Bath", "Half.Bath", "Bedroom.AbvGr", "Kitchen.AbvGr"
-#Bsmt Full Bath (Discrete): Basement full bathrooms
 
-#Bsmt Half Bath (Discrete): Basement half bathrooms
-
-#Full Bath (Discrete): Full bathrooms above grade
-str(data_full)
-#Half Bath (Discrete): Half baths above grade
-
-#Bedroom (Discrete): Bedrooms above grade (does NOT include basement bedrooms)
-
-warnings()
-
-#Kitchen (Discrete): Kitchens above grade
