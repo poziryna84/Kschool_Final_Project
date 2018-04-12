@@ -17,15 +17,8 @@ library(GGally)
 
 ##### 3. Understanding the structure of the data. Variable type modifications. #####
 
-dim(data_full)
 
-# The data frame has 2930 rows and 82 columns.
-
-# Look at the column names:
-
-names(data_full)
-
-#The summary of its internal structue (for more details: https://github.com/poziryna84/Kschool_Final_Project/blob/master/DataSet_Description.RMD):
+# The summary of its internal structue (for more details: https://github.com/poziryna84/Kschool_Final_Project/blob/master/DataSet_Description.RMD):
 
 glimpse(data_full)
 
@@ -40,7 +33,7 @@ data_full$MS.SubClass=as.factor(data_full$MS.SubClass)
 
 summary(data_full$SalePrice)
 
-# With the minimum price of $ 12789 and the maximum of $ 755 000 the mean of $ 180 796 is slightly higher than the median $ 160 000,
+# With the minimum price of $ 12789 and the maximum of $ 755 000 the mean of $ 180 796 is higher than the median $ 160 000,
 # which indicates the skewness of the distribution:
 
 ggplot(data_full, aes(x=SalePrice,y = ..density.., colour="red" )) +geom_density(size = 1, colour = 'brown')+
@@ -53,7 +46,7 @@ ggplot(data_full, aes(x=SalePrice,y = ..density.., colour="red" )) +geom_density
 # It is a unimodal right-skewed distribution. To make it easier to model I will log transform it and use its median and 
 # and interquartile range as measures of center and variability for the further EDA  as they are robust to the outliers.
 
-data_full$SalePrice<-log(data_full$SalePrice) # !!!!! Later
+
 ggplot(data_full, aes(x=log(SalePrice), y = ..density.., colour="blue" )) +geom_density(size = 1, colour = 'brown')+
   geom_histogram(bins = 30, fill = 'pink', colour = 'brown')
 
@@ -77,7 +70,7 @@ data_full %>%
 # and the most expensive as well as the most heterogeneous are StoneBr, NridgHt with the median price of 319000, 317750 
 # and  interquartile range of  168216 and  125280 USD respectively.
 
-# Condition.1 (proximity to various conditions) and 2 (proximity to various conditions if more than one is present).
+# Condition.1 (proximity to various conditions) and condition.2 (proximity to various conditions if more than one is present).
 # For convenience I am going to create a new column that´ll combine both conditions and modify its levels to avoid repetitions.
 
 data_full$Conditions<-as.factor(paste(data_full$Condition.1, data_full$Condition.2, sep = "/"))
@@ -92,8 +85,8 @@ levels(data_full$Conditions) <- gsub("RRAn/Feedr", "Feedr/RRAn", levels(data_ful
 drops_c <- c("Condition.1", "Condition.2")
 data_full<-data_full[ , !(names(data_full) %in% drops_c)]
 
-# Visualizing the relationship between proximity to various conditions with price:
-
+# Visualizing the relationship between proximity to various conditions and price:
+# cHECK WHAT NUMBER IS! 
 number <- function(x){
   return(c(y = median(x)*1.05, label = length(x))) 
 }
@@ -147,7 +140,7 @@ data_full <- data_full %>%
 # MS SubClass identifies the type of dwelling involved in the sale. 
 
 table(data_full$MS.SubClass)
-ggplot(data_full, aes(MS.SubClass, fill=MS.SubClass))+geom_histogram(stat="count")+ggtitle("Zonings count")+xlab("Zonings")+theme_bw()
+ggplot(data_full, aes(MS.SubClass, fill=MS.SubClass))+geom_histogram(stat="count")+ggtitle("Dwelling type")+xlab("Zonings")+theme_bw()
 
 # The histogram and the table show that the majority of the houses (1077) falls into class "020"	(1-STORY 1946 & NEWER ALL STYLES) 
 # and "060"	2-STORY 1946 & NEWER while there is only 1 property
@@ -217,12 +210,12 @@ data_full[(data_full$Gr.Liv.Area>4000 & data_full$SalePrice>650000), c("Sale.Con
 # For my further analysis I will remove any houses with above grade (ground) living area  larger 
 # than 4000 square feet from the data set and only leave those that were sold under "Normal" sale condition.
 
-data_full <- data_full %>% filter(Sale.Condition == "Normal" & Gr.Liv.Area < 4001 ) # !!! Later
+data_full <- data_full %>% filter(Sale.Condition == "Normal" & Gr.Liv.Area < 4001 ) 
 
 # Drop Sale.Condition column
 
 drops <- c("Sale.Condition")
-data_full<-data_full[ , !(names(data_full) %in% drops)] # Later!!!
+data_full<-data_full[ , !(names(data_full) %in% drops)] 
 
 # Lot Area vs. Sale Price shows some significant outliers and non-linear relationship between the two variables:
 # Check its distribution first:
@@ -243,9 +236,9 @@ data_full[(data_full$Lot.Area>100000 & data_full$SalePrice<400000),c("SalePrice"
 # These are good reasons for the prices being a bit lower than expected. To reduce skew and to straighten a nonlinear relationship in a scatterplot,
 # I am going to log transform the Lot.Area too.
 
-data_full$Lot.Area<-log(data_full$Lot.Area)
 
-ggplot(data = data_full, aes(x = Lot.Area, y =log(SalePrice), colour=Land.Slope))+ geom_jitter(size=1)+
+
+ggplot(data = data_full, aes(x = log(Lot.Area), y =log(SalePrice), colour=Land.Slope))+ geom_jitter(size=1)+
   scale_y_continuous(name = "Sale Price")
 
 
@@ -286,7 +279,7 @@ data_full %>% summarise(Age_mean = mean(Age),
 # The median and the mean are arond 40 years, the minimum and the maximum are 1 and 139. The majority of the
 # properties are relatively new (the mode is 7 years) while there are also some which are over 100 years old.
 
-
+# The relationship between the age and the price:
 ggplot(data = data_full, aes(x = Age, y =SalePrice, colour=Overall.Cond))+ geom_jitter(size=1)+
   scale_y_continuous(name = "Sale Price",labels = function(y) paste0(y / 1000, "k"))
 
@@ -294,14 +287,23 @@ ggplot(data = data_full, aes(x = Age, y =SalePrice, colour=Overall.Cond))+ geom_
 # The scatter plot shows somewhat negative moderate to strong linear relationship between age and price. There are some outliers
 # but they are mostly due to the overall condition of the properties. We can conclude that even really
 # old houses can be sold at high prices if the condition is above 7.5 and vice versa.
+# For my further modeling I am going to use "Age" variable:
+data_full<-data_full[ , !(names(data_full) %in% "Year.Built")] 
 
-#Remode:
+#,Remode Year Remod/Add (Discrete): Remodel date (same as construction date if no remodeling or additions)
 
 ggplot(data = data_full, aes(x = Year.Remod.Add, y =SalePrice, colour=Overall.Cond))+ geom_jitter(size=1)+
   scale_y_continuous(name = "Sale Price",labels = function(y) paste0(y / 1000, "k"))
 
-sum(is.na(data_full$Total.Bsmt.SF))
-cor(data_full$Year.Remod.Add, data_full$SalePrice)
+# Creating a new variable "Remode" that will indicate how many years ago the building was remodeled.
+
+data_full$Remode <- sapply(data_full$Year.Remod.Add, function(x) 2011 - x)
+
+ggplot(data = data_full, aes(x =Remode , y =SalePrice, colour="red"))+ geom_jitter(size=1)+
+  scale_y_continuous(name = "Sale Price",labels = function(y) paste0(y / 1000, "k"))
+
+# For my further modeling I am going to use "Remode" variable:
+data_full<-data_full[ , !(names(data_full) %in% "Year.Remod.Add")] 
 
 # Facet wrap !!! for future reference
 ggplot(data_full, aes(x = MS.Zoning, fill=MS.Zoning)) + 
@@ -407,7 +409,7 @@ data_full<-transform(data_full, Fence=fct_explicit_na( Fence, "None"))
 
 sum(is.na(data_full$Fireplace.Qu))
 
-# With 1164 NAs that stand for "no_fireplace". 
+# With 1160 NAs that stand for "no_fireplace". 
 # Before doing anything let´s see if the number of properties
 # with 0 or no fireplace coinsides with the number of NAs in Fireplace.Qu, using Fireplaces which stands for number of fireplaces.
 
@@ -416,6 +418,7 @@ table(data_full$Fireplaces)
 str(data_full$Fireplace.Qu)
 
 # I am going to turn it into "None" and set it to a level.
+data_full<-transform(data_full, Fireplace.Qu=fct_explicit_na(Fireplace.Qu, "None"))
 
 data_full<-transform(data_full, Fireplace.Qu=fct_explicit_na( Fireplace.Qu, "0"))
 data_full$Fireplace.Qu<-recode(data_full$Fireplace.Qu, Ex = "9",Gd="7", Fa="3", TA="5", Po="2")
@@ -457,8 +460,8 @@ glimpse(data_full)
 # Garage.Qual, Garage.Finish, Garage.Cond and Garage.Yr.Blt only if all five of them are NAs (which stands for "no ragage").
 
 
-data_full<-transform(data_full, Garage.Qual=fct_explicit_na(Garage.Qual, "0"))
-data_full<-transform(data_full, Garage.Cond=fct_explicit_na(Garage.Cond, "0"))
+data_full<-transform(data_full, Garage.Qual=fct_explicit_na(Garage.Qual, "None"))
+data_full<-transform(data_full, Garage.Cond=fct_explicit_na(Garage.Cond, "None"))
 data_full$Garage.Yr.Blt[is.na(data_full$Garage.Yr.Blt)] <- 0
 data_full<-transform(data_full, Garage.Finish =fct_explicit_na(Garage.Finish , "None"))
 data_full<-transform(data_full, Garage.Type =fct_explicit_na(Garage.Type , "None"))
@@ -494,8 +497,8 @@ data_full$Bsmt.Full.Bath[is.na(data_full$Bsmt.Full.Bath)] <- 0
 
 data_full<-transform(data_full, BsmtFin.Type.1=fct_explicit_na(BsmtFin.Type.1, "None"))
 data_full<-transform(data_full, BsmtFin.Type.2=fct_explicit_na(BsmtFin.Type.2, "None"))
-data_full<-transform(data_full, Bsmt.Qual=fct_explicit_na(Bsmt.Qual, "0"))
-data_full<-transform(data_full, Bsmt.Cond=fct_explicit_na(Bsmt.Cond, "0"))
+data_full<-transform(data_full, Bsmt.Qual=fct_explicit_na(Bsmt.Qual, "None"))
+data_full<-transform(data_full, Bsmt.Cond=fct_explicit_na(Bsmt.Cond, "None"))
 data_full<-transform(data_full, Bsmt.Exposure=fct_explicit_na(Bsmt.Exposure, "None"))
 
 # The last variable with 11 NAs is Mas.Vnr.Area - the  masonry veneer area. It doesn´t say that NAs stand for no veneer area, so we leave it as
@@ -529,10 +532,6 @@ data_full<-transform(data_full, Mas.Vnr.Type=fct_explicit_na(data_full$Mas.Vnr.T
 
 # Correlation matrix.
 # Quality variables:
-str(data_full[,grep("Q", names(data_full), value=TRUE)] )
-
-# Exterior quality has five levels:  Ex = "excellent",Gd="good", Fa="fair", TA="average/typical", Po = "poor"
-str(data_full$Exter.Qual)
 # Since the overall quality has the widest range of levels I am going to recode the rest of the quality variables accordingly:
 # 10	Very Excellent
 # 9	Excellent
@@ -544,103 +543,52 @@ str(data_full$Exter.Qual)
 # 3	Fair
 # 2	Poor
 # 1	Very Poor
-data_full$Exter.Qual<-recode(data_full$Exter.Qual, Ex = "9",Gd="7", Fa="3", TA="5", Po="2")
-data_full$Exter.Qual<-as.numeric(levels(data_full$Exter.Qual))[data_full$Exter.Qual]
-table(data_full$Exter.Qual)
-#Basement quality has six levels Ex ="excellent", Gd="good", TA= "typical", Fa = "fair", Po = "poor", 0 ="no basement" :
-str(data_full$Bsmt.Qual)
-data_full$Bsmt.Qual<-recode(data_full$Bsmt.Qual, Ex = "9",Gd="7", Fa="3", TA="5", Po="2")
-data_full$Bsmt.Qual<-as.numeric(levels(data_full$Bsmt.Qual))[data_full$Bsmt.Qual]
-table(data_full$Bsmt.Qual)
-# Kitchen Quality:
-str(data_full$Kitchen.Qual)
-data_full$Kitchen.Qual<-recode(data_full$Kitchen.Qual, Ex = "9",Gd="7", Fa="3", TA="5", Po="2")
-data_full$Kitchen.Qual<-as.numeric(levels(data_full$Kitchen.Qual))[data_full$Kitchen.Qual]
-table(data_full$Kitchen.Qual)
-# Garage quality:
-str(data_full$Garage.Qual)
-data_full$Garage.Qual<-recode(data_full$Garage.Qual,   Ex = "9",Gd="7", Fa="3", TA="5", Po="2")
-data_full$Garage.Qual<-as.numeric(levels(data_full$Garage.Qual))[data_full$Garage.Qual]
-str(data_full$Overall.Cond)
-table(data_full$Garage.Qual)
-#Heating
-str(data_full$Heating.QC)
-data_full$Heating.QC<-recode(data_full$Heating.QC,   Ex = "9",Gd="7", Fa="3", TA="5", Po="2")
-data_full$Heating.QC<-as.numeric(levels(data_full$Heating.QC))[data_full$Heating.QC]
-table(data_full$Heating.QC)
-# Correlation plot:
-ggpairs(data_full, columns = c("SalePrice",   "Overall.Qual", "Exter.Qual", "Bsmt.Qual", "Kitchen.Qual","Garage.Qual", "Fireplace.Qu", "Pool.QC", "Heating.QC"))
-
+str(data_full[,grep("Q", names(data_full), value=TRUE)] )
+data_full$Overall.Qual
+q<-data_full[c( "Overall.Qual", "Exter.Qual", "Bsmt.Qual", "Kitchen.Qual","Garage.Qual", "Fireplace.Qu", "Pool.QC", "Heating.QC")]
+q[,2:8] <- ifelse(q[,2:8] == "Ex", 9, ifelse(q[,2:8] == "Gd", 7, ifelse(q[,2:8] == "Fa", 3, ifelse(q[,2:8] == "TA", 5,ifelse(q[,2:8]=="Po", 2,0)))))
+ggpairs(q, columns = colnames(q))
 
 # Since exterior quality, basement quality and kitchen quality are very highly correlated (>0.5) with
 # with each other and with overall quality, having more than 1 one of them might lead us
 # to multicollinearity. Therefore I am going to drop exterior quality, basement quality and kitchen quality 
 # and use overall quality to represent them all.
-drops_q <- c("Exter.Qual", "Bsmt.Qual", "Kitchen.Qual")
-data_full<-data_full[ , !(names(data_full) %in% drops_q)]
-data_full$Overall.Qual=as.factor(data_full$Overall.Qual)
-data_full$Overall.Qual=as.factor(data_full$Heating.QC)
-data_full$Overall.Qual=as.factor(data_full$Garage.Qual)
-data_full$Overall.Qual=as.factor(data_full$Fireplace.Qu)
-data_full$Overall.Qual=as.factor(data_full$Pool.QC)
-# Condition variables:
-str(data_full[,grep("Cond", names(data_full), value=TRUE)] )
-#Overall condition:  rates the overall condition of the house
-# 10	Very Excellent
-# 9	Excellent
-# 8	Very Good
-# 7	Good
-# 6	Above Average	
-# 5	Average
-# 4	Below Average	
-# 3	Fair
-# 2	Poor
-# 1	Very Poor
-glimpse(data_full)
-str(data_full$Exter.Cond)
-str(data_full$Overall.Cond)
-#Kitchen condition:
 
-data_full$Overall.Cond<-recode(data_full$Overall.Cond, Ex = "5",Gd="4", Fa="3", TA="2", Po="1")
-data_full$Exter.Cond<-recode(data_full$Exter.Cond, Ex = "5",Gd="4", Fa="3", TA="2", Po="1")
-
-data_full$Exter.Cond<-as.numeric(levels(data_full$Exter.Cond))[data_full$Exter.Cond]
-data_full$Overall.Cond<-as.numeric(levels(data_full$Overall.Cond))[data_full$Overall.Cond]
-# Basement condition:
-data_full$Bsmt.Cond<-recode(data_full$Bsmt.Cond, Ex = "5",Gd="4", Fa="3", TA="2", Po="1")
-data_full$Bsmt.Cond<-as.numeric(levels(data_full$Bsmt.Cond))[data_full$Bsmt.Cond]
-
-# Garage condition:
-data_full$Garage.Cond<-recode(data_full$Garage.Cond, Ex = "5",Gd="4", Fa="3", TA="2", Po="1")
-data_full$Garage.Cond<-as.numeric(levels(data_full$Garage.Cond))[data_full$Garage.Cond]
-ggpairs(data_full, columns = c("SalePrice",   "Overall.Cond", "Exter.Cond", "Bsmt.Cond", "Garage.Cond"))
-
-# Condition variables are not correlated(<0.5) therefore I am leaving them as the are.
-data_full$Overall.Cond=as.factor(data_full$Overall.Cond)
 # Area variables.
 # Lot area
 # BsmtFin SF 1 
 data_full$Total.Bsmt.SF
 #The area of the house and the rooms:
-ggpairs(data_full, columns = c("SalePrice","Gr.Liv.Area", "TotRms.AbvGrd", "Bedroom.AbvGr", "Kitchen.AbvGr", 
+ggpairs(data_full, columns = c("Gr.Liv.Area", "TotRms.AbvGrd", "Bedroom.AbvGr", "Kitchen.AbvGr", 
                                "X1st.Flr.SF", "X2nd.Flr.SF", "Low.Qual.Fin.SF", "Full.Bath", "Half.Bath", "Fireplaces"))
 
 # TotRms.AbvGrd, Bedroom.AbvGr, X1st.Flr.SF, X2nd.Flr.SF, Full.Bath are highly correlated with Gr.Liv.Area
-# and some of them with each other. Therefore I am going to drop these variables:
-drops_2 <- c("TotRms.AbvGrd", "Bedroom.AbvGr", "X1st.Flr.SF", "X2nd.Flr.SF", "Full.Bath")
-data_full<-data_full[ , !(names(data_full) %in% drops_2)]
+# and some of them with each other. Therefore I will drop these variables:
 
-# Lot Area:
-ggpairs(data_full, columns = c("SalePrice", "Lot.Area", "Lot.Frontage", "Open.Porch.SF", "Enclosed.Porch",
-                               "X3Ssn.Porch", "Screen.Porch", "Pool.Area", "Garage.Cars", "Gr.Liv.Area")) # no correlations
+# Garage and garage cars
+ggpairs(data_full, columns = c( "SalePrice", "Garage.Cars", "Garage.Area")) # 0.887 - garage cars will be dropped
 
-#Basement and its rooms and square feet:
-ggpairs(data_full, columns = c("SalePrice","Total.Bsmt.SF", "BsmtFin.SF.1", "BsmtFin.SF.2" , "Bsmt.Unf.SF", 
+
+#Basement and its rooms and square feet and bathrooms:
+ggpairs(data_full, columns = c("Total.Bsmt.SF", "BsmtFin.SF.1", "BsmtFin.SF.2" , "Bsmt.Unf.SF", 
                                
                                "Bsmt.Full.Bath", "Bsmt.Half.Bath"))
+
 # Total Basement square feet is very correlated with BsmtFin.Sf.1
 # Therefore I am going to drop it.
-drops_1 <- c("BsmtFin.SF.1")
-data_full<-data_full[ , !(names(data_full) %in% drops_1)]
 
 
+# Final Modifications & drops:
+
+
+drops_f <- c("Exter.Qual", "Bsmt.Qual", "Kitchen.Qual", "TotRms.AbvGrd", "Bedroom.AbvGr", "X1st.Flr.SF", "X2nd.Flr.SF", "Full.Bath",
+             "Garage.Cars","BsmtFin.SF.1" )
+data_full<-data_full[ , !(names(data_full) %in% drops_f)]
+str(data_full)
+# to factor:
+data_full$Overall.Qual=as.factor(data_full$Overall.Qual) 
+data_full$Overall.Cond=as.factor(data_full$Overall.Cond)
+
+# Log transformation:
+data_full$SalePrice<-log(data_full$SalePrice) # !!!!! Later
+data_full$Lot.Area<-log(data_full$Lot.Area) # Later
