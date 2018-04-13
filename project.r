@@ -171,7 +171,7 @@ ggplot(data_full, aes(x = Overall.Qual, fill=as.factor(Overall.Qual))) +
 
 # Overall Condition:
 
-ggplot(data_full, aes(as.factor(Overall.Cond), fill=as.factor(Overall.Cond)))+geom_histogram(stat="count")+ggtitle("Zonings count")+xlab("Zonings")+theme_bw()
+ggplot(data_full, aes(as.factor(Overall.Cond), fill=as.factor(Overall.Cond)))+geom_histogram(stat="count")+ggtitle("Overall condition")+xlab("Rates of overall condition")+theme_bw()
 
 table(as.factor(data_full$Overall.Cond))
 ggplot(data_full, aes(x = Overall.Cond, fill=as.factor(Overall.Cond))) + 
@@ -183,12 +183,21 @@ ggplot(data_full, aes(x = Overall.Cond, fill=as.factor(Overall.Cond))) +
 # can be explained by the biggest number of the properties there.
 
 # Fireplaces:
+
 table(as.factor(data_full$Fireplaces))
 ggplot(data = data_full, aes(x =reorder(as.factor(Fireplaces), SalePrice, median) , y =SalePrice,color=as.factor(Fireplaces))) +geom_boxplot(outlier.size=0.2)+ 
     scale_y_continuous(name = "Price", labels = function(y) paste0(y / 1000, "k"))+ ggtitle("Number of fireplaces vs Price")+
     scale_x_discrete(name="Number of fireplaces")
 
 # The number of fireplaces seems to be related to the price too. 
+ggplot(data_full, aes(House.Style, fill=House.Style))+geom_histogram(stat="count")+theme_bw()
+
+levels(data_full$Electrical)
+ggplot(data = data_full, aes(x =reorder(Electrical, SalePrice, median) , y =SalePrice,color=Electrical)) +geom_boxplot(outlier.size=0.2)+ 
+  scale_y_continuous(name = "Price", labels = function(y) paste0(y / 1000, "k"))+ ggtitle("Number of fireplaces vs Price")+
+  scale_x_discrete(name="Building Type")
+
+
 
 # Outliers analysis and filtering the data set.
 
@@ -235,7 +244,6 @@ data_full[(data_full$Lot.Area>100000 & data_full$SalePrice<400000),c("SalePrice"
 
 # These are good reasons for the prices being a bit lower than expected. To reduce skew and to straighten a nonlinear relationship in a scatterplot,
 # I am going to log transform the Lot.Area too.
-
 
 
 ggplot(data = data_full, aes(x = log(Lot.Area), y =log(SalePrice), colour=Land.Slope))+ geom_jitter(size=1)+
@@ -350,12 +358,7 @@ ggplot(,aes(x=as.integer(NA_data_full[1,]), y=variable.names(NA_data_full))) +
         panel.grid.minor.x = element_blank(),
         panel.grid.major.y = element_line(colour="brown", linetype="dashed"))
 
-# For many predictors the number of NA values is too significant to ignore and we should keep in mind that in some cases NAs 
-# stand for no variable. More detailed analysis of missing data is needed.
-
-# Pool.QC.
-
-# The variable with the highest number of missing values is "Pool.QC"(pool quality) - 2403 NAs:
+# For many predictors the number of NA values is too significant to ignore. The variable with the biggest number of missing values is "Pool.QC"(pool quality) - 2403 NAs:
 
 sum(is.na(data_full$Pool.QC))
 table(data_full$Pool.QC)
@@ -366,145 +369,14 @@ table(data_full$Pool.QC)
 # only 200 sunny days a year on average.
 
 
-# As NA stands for no pool, I am going to change them for "None" level:
+# Appart from pool quality there are 14 other variables where NA stands for no variable.
+# I am going to set NA to a level in all of them:
 
-data_full<-transform(data_full, Pool.QC=fct_explicit_na(Pool.QC, "None"))
-str(data_full$Pool.QC)
-data_full$Pool.QC<-recode(data_full$Pool.QC, Ex = "9",Gd="7", Fa="3", TA="5", Po="2", None="0")
-data_full$Pool.QC<-as.numeric(levels(data_full$Pool.QC))[data_full$Pool.QC]
-
-# "Miscellaneous feature".
-
-# With 2316 NAs out of 2412. These are the propreties with some features not covered in other 
-# categories such as, elevator, 2nd garage, tennins court, shed (a simple roofed structure used for garden storage, to 
-# shelter animals, or as a workshop), other.
-
-sum(is.na(data_full$Misc.Feature))
-
-# As was mentioned above  NA stands for no "Miscellaneous feature". That´s why I am going to change NAs for "None" and set to a level:
-
-data_full<-transform(data_full, Misc.Feature=fct_explicit_na( Misc.Feature, "None"))
-
-
-# "Alley" - type of alley access to property(Grvl./Pave).
-
-table(data_full$Alley)
-sum(is.na(data_full$Alley))
-
-# With 2258 out of  2412 being NAs. NA stands for "No alley access",therefore I am going to turn it into "None" and set it to a level.
-
-data_full<-transform(data_full, Alley=fct_explicit_na( Alley, "None"))
-
-# "Fense"(fence quality). 
-
-sum(is.na(data_full$Fence))
-
-
-# With  1910 being NAs. NAs stand for "no_fence", therefore I am going to turn it into "None" and set it to a level.
-
-
-data_full<-transform(data_full, Fence=fct_explicit_na( Fence, "None"))
-
-# The next variable with high number of NAs is "Fireplace.Qu"(fireplace quality).
-
-sum(is.na(data_full$Fireplace.Qu))
-
-# With 1160 NAs that stand for "no_fireplace". 
-# Before doing anything let´s see if the number of properties
-# with 0 or no fireplace coinsides with the number of NAs in Fireplace.Qu, using Fireplaces which stands for number of fireplaces.
-
-sum(is.na(data_full$Fireplace.Qu)) == length(which(data_full$Fireplaces== 0)) # they are the same;
-table(data_full$Fireplaces)
-str(data_full$Fireplace.Qu)
-
-# I am going to turn it into "None" and set it to a level.
-data_full<-transform(data_full, Fireplace.Qu=fct_explicit_na(Fireplace.Qu, "None"))
-
-data_full<-transform(data_full, Fireplace.Qu=fct_explicit_na( Fireplace.Qu, "0"))
-data_full$Fireplace.Qu<-recode(data_full$Fireplace.Qu, Ex = "9",Gd="7", Fa="3", TA="5", Po="2")
-data_full$Fireplace.Qu<-as.numeric(levels(data_full$Fireplace.Qu))[data_full$Fireplace.Qu]
-table(data_full$Fireplace.Qu)
-
-# LotFrontage Lot frontage means the portion of a lot that abuts a public or private street.
-
-# There are 451 NAs.
-
-sum(is.na(data_full$Lot.Frontage))
-
-
-# As it doesn´t say that NAs stand for "no frontage" I am going to replace it with its median value:
-
-data_full$Lot.Frontage[is.na(data_full$Lot.Frontage)] <- median(data_full$Lot.Frontage, na.rm = TRUE)
-
-# Let´s take a look at the 5 "garage" group variables: Garage.Yr.Blt, Garage.Type, Garage.Qual,
-# Garage.Finish, Garage.Cond, Garage.Area, Garage.Cars. Almost all of them have different number of NAs.
-
-sum(is.na(data_full$Garage.Yr.Blt)) # with 117 NAs
-sum(is.na(data_full$Garage.Type))   # with 116 NAs  NA	stands for "No Garage"
-sum(is.na(data_full$Garage.Qual))   # with 117 NAs  NA	stands for "No Garage"
-sum(is.na(data_full$Garage.Finish)) # with 116 NAs  NA	stands for "No Garage"
-sum(is.na(data_full$Garage.Cond))   # with 117 NAs  NA	stands for "No Garage"
-
-# To see how they all might relate I am going to create a subset of the dataset with the 7 "garage"
-# variables and the PID and order:
-
-gar_col<-c("Order", "PID", "Garage.Yr.Blt", "Garage.Type", "Garage.Qual", "Garage.Finish", "Garage.Cond",
-                      "Garage.Area", "Garage.Cars")
-gar_data<-data_full[gar_col]
-
-gar_data[!is.na(gar_data$Garage.Type) & is.na(gar_data$Garage.Qual),]
-glimpse(data_full)
-# Property 1357 has a detached garage with area of 360  sq. feet  for 1 car. Even though NAs in Garage.Cond and 
-
-# Garage.Qual stand for "no garage" I doubt this is the case. Therefore I am going replace 116 NAs with "None" for Garage.Type,
-# Garage.Qual, Garage.Finish, Garage.Cond and Garage.Yr.Blt only if all five of them are NAs (which stands for "no ragage").
-
-
-data_full<-transform(data_full, Garage.Qual=fct_explicit_na(Garage.Qual, "None"))
-data_full<-transform(data_full, Garage.Cond=fct_explicit_na(Garage.Cond, "None"))
-data_full$Garage.Yr.Blt[is.na(data_full$Garage.Yr.Blt)] <- 0
-data_full<-transform(data_full, Garage.Finish =fct_explicit_na(Garage.Finish , "None"))
-data_full<-transform(data_full, Garage.Type =fct_explicit_na(Garage.Type , "None"))
-
-# The last group of variables of interest with NAs are the 11 basement varibals:
-
-sum(is.na(data_full$BsmtFin.Type.1))    # with 67 NAs - Rating of basement finished area; with NA for "No Basement"
-
-sum(is.na(data_full$BsmtFin.Type.2))    # with 67 NAs - Rating of basement finished area (if multiple types); with NA for "No Basement"
-
-sum(is.na(data_full$Bsmt.Qual))         # with 67 NAs - evaluates the height of the basement (excellent: 100+ inches, etc.); with NA for "No Basement"
-sum(is.na(data_full$Bsmt.Cond))         # with 67 NAs - evaluates the general condition of the basement; with NA for "No Basement"
-sum(is.na(data_full$Bsmt.Exposure))     # with 67 NAs - Refers to walkout or garden level walls; with NA for "No Basement"
-sum(is.na(data_full$Bsmt.Half.Bath))    # with 1  NAs - Basement half bathrooms
-sum(is.na(data_full$Bsmt.Full.Bath))    # with 1  NAs - Basement full bathrooms
-
-# For convenience I am going to create a subset of 11  "basement variables" only.
-
-basement_col<-c("Order", "PID", "BsmtFin.Type.1", "BsmtFin.SF.1", "BsmtFin.Type.2", "BsmtFin.SF.2", "Total.Bsmt.SF",
-                               "Bsmt.Unf.SF", "Bsmt.Qual", "Bsmt.Cond", "Bsmt.Exposure", "Bsmt.Full.Bath", "Bsmt.Half.Bath" )
-base_data<-data_full[basement_col] 
-
-
-# Since all the variables where NAs stand for "no basement" have the same number of NAs we can check if they all coincide:
-
-#Bathrooms check:
-base_data[is.na(base_data$Bsmt.Half.Bath),] # clearly no basement in the property 1302:
-nrow(base_data[is.na(base_data$BsmtFin.Type.1) & is.na(base_data$BsmtFin.Type.2) & is.na(base_data$Bsmt.Qual)
-               & is.na(base_data$Bsmt.Cond) & is.na(base_data$Bsmt.Exposure),]) # 67 cases
-data_full$Bsmt.Half.Bath[is.na(data_full$Bsmt.Half.Bath)] <- 0
-data_full$Bsmt.Full.Bath[is.na(data_full$Bsmt.Full.Bath)] <- 0
-# And convert these NAs to "None"
-
-data_full<-transform(data_full, BsmtFin.Type.1=fct_explicit_na(BsmtFin.Type.1, "None"))
-data_full<-transform(data_full, BsmtFin.Type.2=fct_explicit_na(BsmtFin.Type.2, "None"))
-data_full<-transform(data_full, Bsmt.Qual=fct_explicit_na(Bsmt.Qual, "None"))
-data_full<-transform(data_full, Bsmt.Cond=fct_explicit_na(Bsmt.Cond, "None"))
-data_full<-transform(data_full, Bsmt.Exposure=fct_explicit_na(Bsmt.Exposure, "None"))
-
-# The last variable with 11 NAs is Mas.Vnr.Area - the  masonry veneer area. It doesn´t say that NAs stand for no veneer area, so we leave it as
-# it is for now.
-
-sum(is.na(data_full$Mas.Vnr.Area)) 
+NA_cols<-c("Pool.QC", "Misc.Feature", "Alley", "Fence", "Fireplace.Qu",  "Garage.Yr.Blt","Garage.Type", "Garage.Qual", 
+           "Garage.Finish","Garage.Cond", "BsmtFin.Type.1", "BsmtFin.Type.2","Bsmt.Qual",
+           "Bsmt.Cond","Bsmt.Exposure")
+length(NA_cols)
+data_full[NA_cols]<-lapply(data_full[,NA_cols], function(x) addNA(x))
 
 # Before dealing with NAs I am going to replace all blanks with NAs
 
@@ -524,11 +396,51 @@ ggplot(,aes(x=as.integer(NA_data_full[1,]), y=variable.names(NA_data_full))) +
         panel.grid.minor.x = element_blank(),
         panel.grid.major.y = element_line(colour="brown", linetype="dashed"))
 
+
+# LotFrontage Lot frontage means the portion of a lot that abuts a public or private street.
+
+# There are 451 NAs.
+
+sum(is.na(data_full$Lot.Frontage))
+
+
+# As it doesn´t say that NAs stand for "no frontage" I am going to replace it with its median value:
+
+data_full$Lot.Frontage[is.na(data_full$Lot.Frontage)] <- median(data_full$Lot.Frontage, na.rm = TRUE)
+
+#Basement bathrooms:
+
+base_data[is.na(base_data$Bsmt.Half.Bath & is.na(base_data$Bsmt.Full.Bath)),] 
+
+# There is clearly no basement in the property 1301 therefore I am going to replace them with 0:
+
+data_full$Bsmt.Half.Bath[is.na(data_full$Bsmt.Half.Bath)] <- 0
+data_full$Bsmt.Full.Bath[is.na(data_full$Bsmt.Full.Bath)] <- 0
+
 # Regarding the two Masonry veneer related variables the number of NA is negligible (less than 0.5%) so I'll 
 # assume that NA are "None" for MasVnrType and 0 for MasVnrArea.
 
+table(data_full$Mas.Vnr.Type)
 data_full$Mas.Vnr.Area[is.na(data_full$Mas.Vnr.Area)] <- 0
 data_full<-transform(data_full, Mas.Vnr.Type=fct_explicit_na(data_full$Mas.Vnr.Type, "None"))
+
+# There is only 1 NA in "Electrical, which I am going to replace with the most commun level "SBrkr"
+# and also drop the "Mix" level since there are no properties with such electrical system:
+
+data_full<-transform(data_full, Electrical=fct_explicit_na(data_full$Electrical, "SBrkr"))
+data_full <- data_full %>%
+  filter(Electrical!= "CBlock") %>%
+  droplevels()
+
+
+# I will create new variables called "Garage" and "Basement" to specify whether there is basement or not:
+data_full$Garage<-ifelse(data_full$Garage.Qual == "NA", 
+                         c("no"), c("yes"))
+
+# I will create a new variable called "Basement" to specify whether there is basement or not:
+data_full$Basement<-ifelse(data_full$Bsmt.Cond == "NA", 
+                           c("no"), c("yes"))
+
 
 # Correlation matrix.
 # Quality variables:
@@ -590,5 +502,7 @@ data_full$Overall.Qual=as.factor(data_full$Overall.Qual)
 data_full$Overall.Cond=as.factor(data_full$Overall.Cond)
 
 # Log transformation:
-data_full$SalePrice<-log(data_full$SalePrice) # !!!!! Later
-data_full$Lot.Area<-log(data_full$Lot.Area) # Later
+data_full$SalePrice<-log(data_full$SalePrice)
+data_full$Lot.Area<-log(data_full$Lot.Area) 
+
+
