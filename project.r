@@ -2,9 +2,11 @@
 
 data_full = read.csv("AmesHousing.csv", header=TRUE, sep = ";")
 
+
+
 ##### 2. Loading packages #####
 
-library(dplyr)          # data manipulation #
+library(dplyr)# data manipulation #
 library('plyr')         # data manipulation
 library('ggplot2')      # library to create plots #   
 require("stringi")      # string/text processing
@@ -13,19 +15,14 @@ library(forcats)        # reordering and modifying factor levels
 install.packages("naniar")
 library("naniar")       # replace specified values with an NA
 library(GGally)
-
+library(caret)          #near z-predictors
 
 ##### 3. Understanding the structure of the data. Variable type modifications. #####
 
 
 # The summary of its internal structue (for more details: https://github.com/poziryna84/Kschool_Final_Project/blob/master/DataSet_Description.RMD):
 
-glimpse(data_full)
 
-# MS.SubClass identifies the type of dwelling involved in the sale, e.g. "020" stands for	"1-STORY 1946 & NEWER ALL STYLES",
-# and therefore should be converted into factor
-
-data_full$MS.SubClass=as.factor(data_full$MS.SubClass)
 
 # As our response variable is SalePrice it´s a good idea to take a look at its distribution and shape to decide
 # on the most appropriate measures of center and spread; whether or not any varibly transformation is needed; and
@@ -140,7 +137,7 @@ data_full <- data_full %>%
 # MS SubClass identifies the type of dwelling involved in the sale. 
 
 table(data_full$MS.SubClass)
-ggplot(data_full, aes(MS.SubClass, fill=MS.SubClass))+geom_histogram(stat="count")+ggtitle("Dwelling type")+xlab("Zonings")+theme_bw()
+ggplot(data_full, aes(as.factor(MS.SubClass), fill=as.factor(MS.SubClass)))+geom_histogram(stat="count")+ggtitle("Dwelling type")+xlab("Zonings")+theme_bw()
 
 # The histogram and the table show that the majority of the houses (1077) falls into class "020"	(1-STORY 1946 & NEWER ALL STYLES) 
 # and "060"	2-STORY 1946 & NEWER while there is only 1 property
@@ -191,11 +188,13 @@ ggplot(data = data_full, aes(x =reorder(as.factor(Fireplaces), SalePrice, median
 
 # The number of fireplaces seems to be related to the price too. 
 ggplot(data_full, aes(House.Style, fill=House.Style))+geom_histogram(stat="count")+theme_bw()
+table(data_full$Electrical)
 
 levels(data_full$Electrical)
 ggplot(data = data_full, aes(x =reorder(Electrical, SalePrice, median) , y =SalePrice,color=Electrical)) +geom_boxplot(outlier.size=0.2)+ 
   scale_y_continuous(name = "Price", labels = function(y) paste0(y / 1000, "k"))+ ggtitle("Number of fireplaces vs Price")+
   scale_x_discrete(name="Building Type")
+
 
 
 
@@ -206,10 +205,13 @@ ggplot(data = data_full, aes(x =reorder(Electrical, SalePrice, median) , y =Sale
 ggplot(data = data_full, aes(x = Gr.Liv.Area, y =SalePrice, colour=Sale.Condition))+ geom_jitter(size=1)+
   scale_y_continuous(name = "Sale Price",labels = function(y) paste0(y / 1000, "k"))
 
+
 # Three of them with the living area bigger than 4500 square feet (418.0636 square meters) sold at low prices of less than $200 000.
 # They were also were sold partially and might not represent true market values.
 
 data_full[(data_full$Gr.Liv.Area>4000 & data_full$SalePrice<200000), c("Sale.Condition")]
+
+
 
 # The other two (order numbers 1761 1768) are just unusual sales. Very large houses and quite appropriate prices.Though one of them was sold under abnormal sale 
 # conditions.
@@ -218,13 +220,6 @@ data_full[(data_full$Gr.Liv.Area>4000 & data_full$SalePrice>650000), c("Sale.Con
 
 # For my further analysis I will remove any houses with above grade (ground) living area  larger 
 # than 4000 square feet from the data set and only leave those that were sold under "Normal" sale condition.
-
-data_full <- data_full %>% filter(Sale.Condition == "Normal" & Gr.Liv.Area < 4001 ) 
-
-# Drop Sale.Condition column
-
-drops <- c("Sale.Condition")
-data_full<-data_full[ , !(names(data_full) %in% drops)] 
 
 # Lot Area vs. Sale Price shows some significant outliers and non-linear relationship between the two variables:
 # Check its distribution first:
@@ -253,6 +248,7 @@ ggplot(data = data_full, aes(x = log(Lot.Area), y =log(SalePrice), colour=Land.S
 # Year built and its distribution.
 
 ggplot(data=data_full, aes(Year.Built, y = ..density.., colour="red")) +geom_density(size = 1, colour = 'brown')+ geom_histogram(bins = 30, fill = 'pink', colour = 'brown')
+
 
 # The distribution shows multimodality and left-skewness of the data. We can see that there were a construction boom 
 # from 1950 up to 1975, then after a drop of construction in the 80's building houses continued in  the early 90's again.
@@ -320,20 +316,32 @@ ggplot(data_full, aes(x = MS.Zoning, fill=MS.Zoning)) +
 
 # Total Bsmnt. square feet:
 
-ggplot(data = data_full, aes(x = Total.Bsmt.SF, y =SalePrice, colour="red"))+ geom_jitter(size=1)+
+ggplot(data = data_full, aes(x = Total.Bsmt.SF, y =SalePrice, colour=Sale.Condition))+ geom_jitter(size=1)+
   scale_y_continuous(name = "Sale Price",labels = function(y) paste0(y / 1000, "k"))
-cor(data_full$Total.Bsmt.SF, data_full$SalePrice)
+
 # The plot shows strong positive linear relationship between  price the total area of the basement.
+# There are a couple of outliers that indicate very big basements, but those will be removed, as they 
+# were sold under partial conditions.
 
 #Garage area:
 
-sum(is.na(data_full$Garage.Area))
-ggplot(data = data_full, aes(x = Garage.Area, y =SalePrice, colour=Overall.Cond))+ geom_jitter(size=1)+
+sum(is.na(data_full$Garage.Cars))
+ggplot(data = data_full, aes(x = Garage.Cars, y =SalePrice,  colour=Sale.Condition, na.rm = TRUE))+ geom_jitter(size=1)+
   scale_y_continuous(name = "Sale Price",labels = function(y) paste0(y / 1000, "k"))
+
+ggplot(data = data_full, aes(x =reorder(as.factor(Garage.Cars), SalePrice, median) , y =SalePrice,color=as.factor(Garage.Cars))) +geom_boxplot(outlier.size=0.2)+ 
+  scale_y_continuous(name = "Price", labels = function(y) paste0(y / 1000, "k"))+ ggtitle("Number of cars vs Price")+
+  scale_x_discrete(name="Number of cars")
 cor(data_full$Garage.Area, data_full$SalePrice)
 
 # The plot shows strong positive linear relationship between  price the total area of the garage.
 
+
+data_full <- data_full %>% filter(Sale.Condition == "Normal" & Gr.Liv.Area < 4001 )
+# Drop Sale.Condition column
+
+drops <- c("Sale.Condition")
+data_full<-data_full[ , !(names(data_full) %in% drops)] 
 
 ##### 5. Missing values. #####
 
@@ -426,20 +434,11 @@ data_full<-transform(data_full, Mas.Vnr.Type=fct_explicit_na(data_full$Mas.Vnr.T
 
 # There is only 1 NA in "Electrical, which I am going to replace with the most commun level "SBrkr"
 # and also drop the "Mix" level since there are no properties with such electrical system:
-
+table(data_full$Electrical)
 data_full<-transform(data_full, Electrical=fct_explicit_na(data_full$Electrical, "SBrkr"))
 data_full <- data_full %>%
   filter(Electrical!= "CBlock") %>%
   droplevels()
-
-
-# I will create new variables called "Garage" and "Basement" to specify whether there is basement or not:
-data_full$Garage<-ifelse(data_full$Garage.Qual == "NA", 
-                         c("no"), c("yes"))
-
-# I will create a new variable called "Basement" to specify whether there is basement or not:
-data_full$Basement<-ifelse(data_full$Bsmt.Cond == "NA", 
-                           c("no"), c("yes"))
 
 
 # Correlation matrix.
@@ -455,7 +454,8 @@ data_full$Basement<-ifelse(data_full$Bsmt.Cond == "NA",
 # 3	Fair
 # 2	Poor
 # 1	Very Poor
-str(data_full[,grep("Q", names(data_full), value=TRUE)] )
+
+
 data_full$Overall.Qual
 q<-data_full[c( "Overall.Qual", "Exter.Qual", "Bsmt.Qual", "Kitchen.Qual","Garage.Qual", "Fireplace.Qu", "Pool.QC", "Heating.QC")]
 q[,2:8] <- ifelse(q[,2:8] == "Ex", 9, ifelse(q[,2:8] == "Gd", 7, ifelse(q[,2:8] == "Fa", 3, ifelse(q[,2:8] == "TA", 5,ifelse(q[,2:8]=="Po", 2,0)))))
@@ -469,20 +469,20 @@ ggpairs(q, columns = colnames(q))
 # Area variables.
 # Lot area
 # BsmtFin SF 1 
-data_full$Total.Bsmt.SF
+
 #The area of the house and the rooms:
-ggpairs(data_full, columns = c("Gr.Liv.Area", "TotRms.AbvGrd", "Bedroom.AbvGr", "Kitchen.AbvGr", 
-                               "X1st.Flr.SF", "X2nd.Flr.SF", "Low.Qual.Fin.SF", "Full.Bath", "Half.Bath", "Fireplaces"))
+ggpairs(data_full, columns = c("SalePrice",  "Gr.Liv.Area", "TotRms.AbvGrd", "Bedroom.AbvGr", "Kitchen.AbvGr", 
+                               "X1st.Flr.SF", "X2nd.Flr.SF", "Full.Bath", "Half.Bath", "Fireplaces"))
 
 # TotRms.AbvGrd, Bedroom.AbvGr, X1st.Flr.SF, X2nd.Flr.SF, Full.Bath are highly correlated with Gr.Liv.Area
 # and some of them with each other. Therefore I will drop these variables:
 
 # Garage and garage cars
-ggpairs(data_full, columns = c( "SalePrice", "Garage.Cars", "Garage.Area")) # 0.887 - garage cars will be dropped
+ggpairs(data_full, columns = c( "SalePrice", "Garage.Cars", "Garage.Area")) # 0.887 - Garage.Area will be dropped
 
 
 #Basement and its rooms and square feet and bathrooms:
-ggpairs(data_full, columns = c("Total.Bsmt.SF", "BsmtFin.SF.1", "BsmtFin.SF.2" , "Bsmt.Unf.SF", 
+ggpairs(data_full, columns = c("SalePrice",  "Total.Bsmt.SF", "BsmtFin.SF.1", "BsmtFin.SF.2" , "Bsmt.Unf.SF", 
                                
                                "Bsmt.Full.Bath", "Bsmt.Half.Bath"))
 
@@ -492,17 +492,153 @@ ggpairs(data_full, columns = c("Total.Bsmt.SF", "BsmtFin.SF.1", "BsmtFin.SF.2" ,
 
 # Final Modifications & drops:
 
-
+data_full$Garage.Area
 drops_f <- c("Exter.Qual", "Bsmt.Qual", "Kitchen.Qual", "TotRms.AbvGrd", "Bedroom.AbvGr", "X1st.Flr.SF", "X2nd.Flr.SF", "Full.Bath",
-             "Garage.Cars","BsmtFin.SF.1" )
+             "Garage.Area","BsmtFin.SF.1", "Sale.Condition" )
 data_full<-data_full[ , !(names(data_full) %in% drops_f)]
 str(data_full)
 # to factor:
-data_full$Overall.Qual=as.factor(data_full$Overall.Qual) 
+glimpse(data_full)
+data_full$Overall.Qual=as.factor(data_full$Overall.Qual)
 data_full$Overall.Cond=as.factor(data_full$Overall.Cond)
-
+data_full$Garage=as.factor(data_full$Garage)
+data_full$Basement=as.factor(data_full$Basement)
+# MS.SubClass identifies the type of dwelling involved in the sale, e.g. "020" stands for	"1-STORY 1946 & NEWER ALL STYLES",
+# and therefore should be converted into factor
+data_full$MS.SubClass=as.factor(data_full$MS.SubClass)
 # Log transformation:
+
 data_full$SalePrice<-log(data_full$SalePrice)
 data_full$Lot.Area<-log(data_full$Lot.Area) 
+data_full$Garage.Yr.Blt<-as.numeric(data_full$Garage.Yr.Blt)
+str(data_full)
+data_full$Garage.Yr.Blt
+# Modeling 
+
+data_r<-data_full[c("Lot.Frontage",   "SalePrice","Gr.Liv.Area", "Neighborhood",  "Age", "Remode", "Overall.Qual", "Overall.Cond", "Total.Bsmt.SF", "Garage.Area", "Conditions", "Land.Slope", "Fireplaces", "Lot.Area", "Garage", "Basement", "Pool.QC",
+                    "MS.SubClass", "MS.Zoning", "Street", "Alley", "Lot.Shape", "Land.Contour", "Utilities", "Screen.Porch")]
+
+drops <- c("x","z")
+DF[ , !(names(DF) %in% drops)]
+data_h<-data_full[, !(names(data_full) %in% c("Order","PID", "Sale.Type", "Yr.Sold", "Mo.Sold", "Utilities" ))]
+lapply(data_h[c(colnames(data_h))], unique)
+colnames(data_h)
+str(data_h)
+b<-lm(log(SalePrice) ~., data = data_full[,!(names(data_full) %in% c("Order", "PID", "Yr.Sold", "Mo.Sold"))])
+formula(b)
+frst= lm(SalePrice~1, data=data_full[,!(names(data_full) %in% c("Order", "PID"))])
+step(frst, direction="forward", scope=formula(b))
+step(frst, direction="backward", scope=formula(b))
+table(data_h$Alley)
+str(data_h)
 
 
+# Low variability of categorical variables:
+# Identifying categorical variables with only one level where for most of the observations in data set there 
+# is only one level. Variables with such levels fail to make a positive impact on model 
+# performance due to very low variation. 
+# A function that identifies predictors with the percentage of unique values in the samples is less than {10\%} 
+low_variation<- function(dataset){
+  factor_var <- sapply(dataset, is.factor)
+  factor_df <-dataset[, factor_var]
+  low_var_variables<-c()
+  for (column in names(factor_df)){
+    
+    table_levels = table(factor_df[[column]])
+    table_levels_df = as.data.frame(table_levels)
+    table_levels_df$prop<-100/nrow(factor_df)*table_levels_df$Freq
+    if (max(table_levels_df$prop)>90){
+      low_var_variables<-append(low_var_variables,column,after = length(low_var_variables)) 
+      
+    }
+    
+    
+    
+    
+  }
+  return(low_var_variables)
+}
+
+nrow(data_full)
+low_variation(data_full)
+table(data_full$Garage)
+
+#different way:
+foo <- function(data) {
+  out <- lapply(data, function(x) length(unique(x)))
+  want <- which(!out > 1)
+  unlist(want)
+}
+foo(data_full)
+out <- lapply(data_full, function(x) length(unique(x)))
+want<-which(!out > 1)
+unlist(want)
+# Near-zero variance means that the fraction of unique values over the sample size is low 
+# (say 10%) and the ratio of the frequency of the most prevalent value to the 
+# frequency of the second most prevalent value is large (say around 20). If both of these
+# criteria are true and the model in question is susceptible to this type of predictor, 
+# it may be advantageous to remove the variable from the model.
+
+#-- Kuhn, M., & Johnson, K. (2013). Applied predictive modeling, New York, NY: Springer.
+# Dropping variables with low variance:
+drops_f1 <- c( "Street", "Alley" , "Land.Contour", "Utilities", "Land.Slope", "Roof.Matl",   
+              "Heating", "Central.Air", "Electrical", "Functional", "Garage.Cond", "Paved.Drive",  
+              "Pool.QC", "Misc.Feature", "Sale.Type" )
+data_full<-data_full[ , !(names(data_full) %in% drops_f1)]
+str(data_full)
+x = nearZeroVar(data_full, saveMetrics = TRUE)
+str(x, vec.len=2)
+str(x)
+x[x[,"zeroVar"] > 0, ]
+x[x[,"zeroVar"] + x[,"nzv"] > 0, ]
+x$freqRatio
+ar <- sapply(data_full, is.factor)
+df <-data_full[, ar]
+table(data_full$Garage.Qual)
+length(data_full$Garage.Qual)
+range(data_full$Pool.Area)
+f<-c(7,7,7,7,7,7,6,6,4,4,7)
+unique(f)
+Reduce(intersect, list(f))
+r<-table(f)
+typeof(r)
+sort(table(f),decreasing=TRUE)[1]
+low_variation<- function(dataset){
+  factor_var <- sapply(dataset, is.factor)
+  factor_df <-dataset[, factor_var]
+  low_var_variables<-c()
+  for (column in names(factor_df)){
+    
+    table_levels = table(factor_df[[column]])
+    table_levels_df = as.data.frame(table_levels)
+    table_levels_df$prop<-100/nrow(factor_df)*table_levels_df$Freq
+    if (max(table_levels_df$prop)>90){
+      low_var_variables<-append(low_var_variables,column,after = length(low_var_variables)) 
+      
+    }
+    
+    
+    
+    
+  }
+  return(low_var_variables)
+}
+
+nrow(data_full)
+low_variation(data_full)
+table(data_full$Garage)
+
+#Data Camp
+# One interesting aspect of this dataset is that it contains many variables and many of these variables have extemely low variances. This means that there is very little information in these variables because they mostly consist of a single value (e.g. zero).
+
+# Fortunately, caret contains a utility function called nearZeroVar() for removing such variables to save time during modeling.
+# By default, caret uses freqCut = 19 and uniqueCut = 10, which is fairly conservative.
+# Identify near zero variance predictors: remove_cols
+remove_cols <- nearZeroVar(data_full, names = TRUE, 
+                           freqCut = 19, uniqueCut = 10)
+
+# Get all column names from bloodbrain_x: all_cols
+all_cols<-names(bloodbrain_x)
+
+# Remove from data: bloodbrain_x_small
+bloodbrain_x_small <- bloodbrain_x[ , setdiff(all_cols, remove_cols)]
