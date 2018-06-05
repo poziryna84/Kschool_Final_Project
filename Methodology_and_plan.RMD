@@ -1,0 +1,1070 @@
+---
+title: "Predictive modeling: Advanced Regression Techniques"
+author: "Iryna Pazharytskaya"
+date: "28 de mayo de 2018"
+output: html_document
+---
+```{r, echo=FALSE, message =FALSE, warning=FALSE}
+library('ggplot2')
+library("e1071")
+library("ggpubr")
+library("outliers") 
+library("dplyr") 
+library('corrplot') 
+library("regclass") 
+library("forcats") 
+library("caret")
+library("Boruta")
+```
+
+## Introduction.
+
+In my project I am going to analyze data in order to help provide insight into the housing market of Ames, Iowa and create a model to predict housing prices based on its features. That would help a real estate company make decisions on how to invest for highest profits. The main idea is to make money for the investors, and therefore being able to identify which properties are overvalued and which are undervalued are crucial for Real Estate Business.
+
+## Data.
+
+The `AmesHousing` data set provides housing sales from between 2006 to 2010 and contains variables focused on the quality and quantity of many physical attributes of the property. Most of the variables are exactly the type of information that a typical home buyer would want to know about a potential property, such as the year it was built, the size of the lot, the numbers of rooms, square feet of living space, as well as the neighborhood, utilities, etc.
+
+There are **2930 observations** and **80 variables**:
+
+* **20 continuous variables** related to various area dimensions for each observation. 
+ 
+* **14 discrete variables** typically quantify the number of items occurring within the house. 
+ 
+* **46 categorical variables** (23 nominal, 23 ordinal). They range from 2 to 28 classes with the smallest being `Street` (gravel or paved) and the largest being `Neighborhood` (areas within the Ames city limits). 
+
+More details can be found in the [Dataset description file](https://github.com/poziryna84/Kschool_Final_Project/blob/master/DataSet_Description.RMD).
+
+## Methodology.
+
+**Plan.**
+
+**1. Loading Data set and packages.**
+
+**2. EDA.**
+
+* Response variable analysis.
+
+* Multivariate analysis and understanding the structure of the data.
+
+* Numeric variables.
+
+* Categorical variables analysis.
+
+**3. Handling missing values.**
+
+**4. Feature engineering part.**
+
+* Identifying and dropping unused factor levels.
+* Combining levels.
+* Creating new variables.
+* Final preparations for the modelling.
+
+**5. Modelling and predicting.**
+ 
+## 1. Loading Data set and packages.
+
+*The packeges used are:*
+
+* ggplot2
+* e1071
+* ggpubr
+* outliers
+* dplyr
+* corrplot 
+* regclass 
+* forcats 
+* caret
+* Boruta
+
+## 2. EDA.
+## 2.1 The response variable analysis.
+
+As the response variable is `SalePrice` it`s a good idea to take a look at its distribution and shape to decide on the most appropriate measures of center and spread; whether or not any variable transformation is needed; and lastly on the outliers strategy. 
+
+# Sale Price statistics.
+
+```{r, echo=FALSE}
+
+data = read.csv("AmesHousing.csv", header=TRUE, sep = ";")
+set.seed(123)
+
+split <- sample(nrow(data), floor(0.7*nrow(data)))
+
+train<- data[split,]
+test <- data[-split,]
+summary(train$SalePrice)
+```
+
+With the `min price` of $ 13100 and the `max price` of $ 745000, the `mean` of $ 181118 higher than the `median` of  $ 161500, which indicates the skewness of the distribution:
+
+```{r, echo=FALSE}
+mode <- function(x) {
+  un <- unique(x)
+  un[which.max(tabulate(match(x, un)))]
+}
+ggplot(train, aes(x=SalePrice,y = ..density.., colour="red" )) +geom_density(size = 1, colour = 'brown')+
+  geom_histogram(bins = 30, fill = 'pink', colour = 'brown') +  scale_x_continuous("Sale Price in thousands",labels=function(x) x/1000)+
+  labs(title = "Sale Price distribution")+
+  geom_vline(data = train, mapping = aes( xintercept = mean(train$SalePrice), colour = 'mean'), size = 1.5)+
+  geom_vline(data = train,mapping = aes( xintercept = median(train$SalePrice), colour = 'median'), size = 1.5)+
+  geom_vline(data = train,mapping = aes( xintercept = mode(train$SalePrice), colour = 'mode'), size = 1.5)
+
+
+```
+
+It looks like a unimodal right-skewed distribution. I will use its median and interquartile range as measures of center and variability for the further EDA as they are robust to outliers.
+
+**Shapiro-Wilk normality test. **
+
+```{r, echo=FALSE}
+shapiro.test(train$SalePrice)
+```
+
+With the `p-val` < 2.2e-16 which is less than the significance level of 0.05 we reject the null hypothesis that the data is normally distributed. 
+W = 0.87827. The closer w is to 1 the more likely it is that this distribution is normal.
+
+**Testing for skewness.**
+
+```{r, echo=TRUE}
+skewness(train$SalePrice) 
+```
+
+Positive skewness with the coefficient of 1.70039 > 1 indicates that the mean of the data values is larger than the median, and the data is extremely right-skewed.
+
+For my future modeling I want my data to be as "normal" as possible. To address long-tailed distribution I will try log transformation.
+
+```{r, echo=FALSE}
+S_P_log<-ggplot(train, aes(x=log(SalePrice),y = ..density.., colour="red" )) +geom_density(size = 1, colour = 'brown')+
+  geom_histogram(bins = 30, fill = 'pink', colour = 'brown')+scale_x_continuous("The log of Sale Price",labels=function(x) x/1000)+
+  labs(title = "Sale Price distribution (log)")
+
+S_p<-ggplot(train, aes(x=SalePrice,y = ..density.., colour="red" )) +geom_density(size = 1, colour = 'brown')+
+  geom_histogram(bins = 30, fill = 'pink', colour = 'brown')+scale_x_continuous("Sale Price in thousands",labels=function(x) x/1000)+
+  labs(title = "Sale Price distribution")
+qq_sp<-qplot(sample = SalePrice, data = train)
+qq_lsp <- qplot(sample = log(SalePrice), data = train)
+
+fig_s_p <- ggarrange(S_p,S_P_log,qq_sp,qq_lsp, 
+                 ncol = 2, nrow = 2)
+print(fig_s_p)
+print(shapiro.test(train$SalePrice))
+print(shapiro.test(log(train$SalePrice)))
+```
+
+According to the plots and Shapiro tests log transformation results in the more "normal" distribution. 
+There is one very obvious outlier on the left side of the QQ plot of the logged Sale Price though which might affect the future model performance.
+
+```{r, echo=FALSE}
+grubbs.test(log(train$SalePrice), type=10, opposite = FALSE)
+```
+
+ With `p-value` equal to 2.489e-07 we reject the null hypothesis that this is not an outlier in favor to the alternative hypothesis that the lowest value of 9.48036750918924 is indeed an outlier. Since it is just one single value I am going to remove it from the train set for future modelling.
+
+
+## 2.2 Multivariate analysis and understanding the structure of the data.
+
+```{r, echo=FALSE}
+glimpse(train)
+```
+ 
+ `MS.SubClass` identifies the type of dwelling involved in the sale, e.g. `"020"` stands for	`"1-STORY 1946 & NEWER ALL STYLES"`, and therefore should will be converted into factor as well as `Overall.Qual` and `Overall.Cond`.
+ 
+```{r, echo=FALSE} 
+ train$MS.SubClass<-as.factor(train$MS.SubClass)
+test$MS.SubClass<-as.factor(test$MS.SubClass)
+
+train$Overall.Qual<-as.factor(train$Overall.Qual)
+test$Overall.Qual<-as.factor(test$Overall.Qual)
+
+train$Overall.Cond<-as.factor(train$Overall.Cond)
+test$Overall.Cond<-as.factor(test$Overall.Cond)
+```
+
+## 2.2.1 Numeric variables.
+
+* **Identifying and visualizing numerical variables that are strongly correlated (-0.5 >cor.coef>0.5) with `SalePrice` excluding `Order`, `PID`, `Yr.Sold` and `Mo.Sold` variables.** 
+
+
+```{r, echo=FALSE}
+
+nums <- unlist(lapply(train, is.numeric)) 
+colnames <- dimnames(train[ , nums])[[2]]
+colnames <- colnames[!colnames %in% c("Order", "PID", "Yr.Sold", "Mo.Sold" )]
+
+num_data <- train[,colnames]
+crls <- cor(num_data, method = "spearman")
+
+price_cor <- as.matrix(sort(crls [,'SalePrice'], decreasing = TRUE))
+idx_cor = names(which(apply(price_cor, 1, function(x) (x > 0.5 | x < -0.5))))
+
+corrplot(as.matrix(crls[idx_cor,idx_cor]), type = 'upper', method='color', 
+         addCoef.col = 'black', tl.cex = .7,cl.cex = .7, number.cex=.7)
+```
+
+The plot indicates strongly correlated numerical variables as well as some obvious signs of multicollinearity (`Gr.Liv.Area`, `TotRms.AbvGrd`, `Garage.Cars` vs `Garage.Area`, etc.) which should be considered at the modelling stage.
+
+* **SalePrice vs Gr.Liv.Area (*above ground living area square feet*) vs Sale.Condition.**
+
+```{r, echo=FALSE}
+fig1 <- ggplot(train, aes(x=Gr.Liv.Area, y=SalePrice)) +
+  geom_point(shape=1) + 
+  scale_y_continuous(name = "Sale Price",labels = function(y) paste0(y / 1000, "k"))+
+  labs(title = "Sale price vs Gr.Liv.Area")+
+   geom_smooth(method="lm") 
+
+fig2 <- ggplot(data = train, aes(x = Gr.Liv.Area, y =SalePrice, color=Sale.Condition))+ geom_jitter(size=1)+
+  scale_y_continuous(name = "Sale Price",labels = function(y) paste0(y / 1000, "k"))+
+  labs(title = "Sale price vs Gr.Liv.Area vs Sale.Condition")
+
+fig3 <- ggarrange( fig1, fig2,
+                     ncol = 1, nrow = 2)
+print(fig3)
+```
+
+
+As per the first plot there are clearly at least two high leverage points. One of them with the living area larger than 5000 square feet was sold partially under $200 000 which might not represent true market values. The other one is just an unusual Abnormal condition sale. 
+
+A house sold under abnormal conditions often sells for much less than expected given its square footage. Similarly, a partial sale of a house results in a higher price on average holding constant square footage. Because houses with non-normal selling conditions exhibit atypical behavior and can disproportionately influence the model, I will only consider the properties sold under Normal Sale condition. 
+
+* **Garage.cars vs Garage.Area vs SalePrice.**
+
+```{r, echo=FALSE}
+g.a <- ggplot(train, aes(x= Garage.Area, y=SalePrice)) +
+  geom_point(shape=1) + 
+  scale_y_continuous(name = "Sale Price",labels = function(y) paste0(y / 1000, "k"))+
+  labs(title = "Sale price vs Garage.Area")+
+  geom_smooth(method="lm")
+
+g.a.c <- ggplot(data = train, aes(x = Garage.Area, y =SalePrice, color=as.factor(Garage.Cars)))+ geom_jitter(size=1)+
+  scale_y_continuous(name = "Sale Price",labels = function(y) paste0(y / 1000, "k"))+
+  labs(title = "SalePrice vs Garage.cars vs Garage.Area")
+
+fig4 <- ggarrange( g.a, g.a.c,
+                   ncol = 1, nrow = 2)
+print(fig4)
+```
+
+The plot shows strong linear relationship between `SalePrice` and garage variables as well as the presence of the outliers.
+
+* **Year.Built and Year.Remod.Add vs Sale Price.**
+
+```{r, echo=FALSE}
+y.b<- ggplot(train, aes(x= Year.Built, y=SalePrice)) +
+  geom_point(shape=1) + 
+  scale_y_continuous(name = "Sale Price",labels = function(y) paste0(y / 1000, "k"))+
+  labs(title = "Year.Built vs SalePrice")+
+  geom_smooth(method="lm")
+ 
+y.r<- ggplot(train, aes(x= Year.Remod.Add, y=SalePrice)) +
+   geom_point(shape=1) + 
+   scale_y_continuous(name = "Sale Price",labels = function(y) paste0(y / 1000, "k"))+
+   labs(title = "Year.Remod.Add vs SalePrice")+
+   geom_smooth(method="lm")
+
+fig5 <- ggarrange( y.b, y.r,
+                   ncol = 1, nrow = 2)
+print(fig5)
+```
+
+Even though the plot shows somewhat linear relationships between these variables and the price, we can never classify year directly as quantitative variable as we cannot perform calculations on it, therefore for my future modelling I will convert them into age variables.  
+
+* **Full bath and TotRms.AbvGrd vs SalePrice.**
+
+```{r, echo=FALSE, fig.width = 9}
+f.b <- ggplot(train, aes(x= Full.Bath, y=SalePrice)) +
+  geom_point(shape=1) + 
+  scale_y_continuous(name = "Sale Price",labels = function(y) paste0(y / 1000, "k"))+
+  labs(title = "Full.Bath vs SalePrice")+
+  geom_smooth(method="lm")
+
+t.r <- ggplot(train, aes(x= TotRms.AbvGrd, y=SalePrice)) +
+  geom_point(shape=1) + 
+  scale_y_continuous(name = "Sale Price",labels = function(y) paste0(y / 1000, "k"))+
+  labs(title = "Total Rooms vs SalePrice")+
+  geom_smooth(method="lm")
+
+b.r.p <- ggplot(train, aes(x= TotRms.AbvGrd, y=SalePrice, color=as.factor(Full.Bath))) +
+  geom_point(shape=15) + 
+  scale_y_continuous(name = "Sale Price",labels = function(y) paste0(y / 1000, "k"))+
+  labs(title = "Total Rooms vs Full.Bath vs SalePrice")
+
+fig6 <- ggarrange( f.b, t.r, b.r.p, 
+                   ncol = 2, nrow = 2)
+print(fig6)
+```
+
+Apart from some very rare cases of having whether 0 or 4 bathrooms and/or 13-14 rooms the `SalePrice` seems to be quite dependent on the number of the bathrooms and total number of rooms which is an obvious indicator of the property size.
+
+* **Gr.Liv.Area (*above ground living area*) and area of the 1st and 2nd floors (`X1st.Flr.SF`, `X2nd.Flr.SF`).**
+
+```{r, echo=TRUE}
+nrow(train[train$X2nd.Flr.SF+train$X1st.Flr.SF==train$Gr.Liv.Area ,])
+nrow(train)
+```
+
+We can see that 2023 out of 2051 properties have the sum of the first and the second floor equal to the above ground living area. In other words in 98.63% of the times the sum of `X1st.Flr.SF` and `X2nd.Flr.SF` is simply the `Gr.Liv.Area` therefore I am going to exclude the 1st and 2nd floor area variables from my future modelling as redundant.
+
+
+## 2.2.2 Categorical variables analysis.
+
+* **SalePrice vs. Neighborhood.**
+
+```{r, echo=FALSE, fig.width = 13}
+number <- function(x){
+  return(c(y = median(x)*1.05, label = length(x))) 
+}
+ggplot(data = train, aes(x =reorder(Neighborhood, SalePrice, median) , y =SalePrice,color=Neighborhood)) +geom_boxplot(outlier.size=0.2)+stat_summary(fun.data = number, geom = "text", fun.y = median)+ 
+  scale_y_continuous(name = "Price", labels = function(y) paste0(y / 1000, "k"))+ ggtitle("The Neighborhood vs Price")+
+  
+  scale_x_discrete(name="Neighborhood", labels=c("Mdw","BrDl","IDTR","OldT","BrkSd", "Edwr","SWSU", "Swyr", "Blst","Lndmk","NAms", "NPKvl",
+                                                 "Mtchl", "SwyrW", "NWAms", "Blmgt", "Glbrt", "ClrCr", "ClgCr", "Crwf",
+                                                 "Grns", "Tmbr","Smrst", "Veen", "GrnHll", "NoRd" ,  "NrdgHt", "StnBr"))
+ 
+
+
+neig_stats<-train %>%
+  group_by(Neighborhood)%>%
+  summarise(median.price=median(SalePrice), Iqr.price=IQR(SalePrice), counts=n())%>%
+  arrange(desc(median.price, counts))
+print(as.data.frame(neig_stats))
+```
+
+The plot shows that there is definitely strong relationship between the location and the price of the property. There are also some obvious outliers especially the cases of *Old Town*, *NridgHt*, *NoRidge*. The plot and the summary statistics show that the least expensive neighborhood is *Meadow* with the median price of $ 88 550 and the most expensive as well as the most heterogeneous are *StoneBr*, *NridgHt* with the median price of $ 319 000, $ 317 750 and interquartile range of $ 168216 and $ 125280 respectively. We can also see that there are 28 neighborhoods some of which have number of properties as low as 1 (*Landmrk*) or 5 (*GrnHill*). This problem should be addressed in the feature engineering part. 
+
+* **Overall Quality and Overall Condition vs. SalePrice.**
+
+```{r, echo=FALSE, fig.width = 9}
+o.q<-ggplot(data =train, aes(x =reorder(Overall.Qual, SalePrice, median) , y =SalePrice, color=Overall.Qual)) +geom_boxplot(outlier.size=0.2)+
+  stat_summary(fun.data = number, geom = "text", fun.y = median)+
+  scale_y_continuous(name = "Price", labels = function(y) paste0(y / 1000, "k"))+ ggtitle("Overall Quality vs Price")+
+  scale_x_discrete(name="Quality")
+
+o.c<-ggplot(data =train, aes(x =reorder(Overall.Cond, SalePrice, median) , y =SalePrice, color=Overall.Cond)) +geom_boxplot(outlier.size=0.2)+
+  stat_summary(fun.data = number, geom = "text", fun.y = median)+
+  scale_y_continuous(name = "Price", labels = function(y) paste0(y / 1000, "k"))+ ggtitle("Overall Condition vs Price")+
+  scale_x_discrete(name="Condition")
+fig7 <- ggarrange(o.q, o.c,
+                   ncol = 2, nrow = 1)
+print(fig7)
+```
+
+The box plot shows very strong relationship between `Overall Quality` and `Sale Price`. Not a big surprise since the quality of the property is one of the most important factors when buying. Whereas `Overall Condition` levels seem to be all over the place which indicates the presence of outliers. Levels 1 and 2 in either cases have very low number of observations which should be addressed in the feature engineering part.  
+
+* **The rest of the quality and condition variables.**
+
+```{r, echo=FALSE, fig.width = 9}
+ext.q<-ggplot(data =train, aes(x =reorder(Exter.Qual, SalePrice, median) , y =SalePrice, color=Exter.Qual)) +geom_boxplot(outlier.size=0.2)+
+  stat_summary(fun.data = number, geom = "text", fun.y = median)+
+  scale_y_continuous(name = "Price", labels = function(y) paste0(y / 1000, "k"))+ ggtitle("Exterior Quality vs Price")+
+  scale_x_discrete(name="Exterior Quality")
+
+ext.c<-ggplot(data =train, aes(x =reorder(Exter.Cond, SalePrice, median) , y =SalePrice, color=Exter.Cond)) +geom_boxplot(outlier.size=0.2)+
+  stat_summary(fun.data = number, geom = "text", fun.y = median)+
+  scale_y_continuous(name = "Price", labels = function(y) paste0(y / 1000, "k"))+ ggtitle("Exterior Condition vs Price")+
+  scale_x_discrete(name="Exterior Condition")
+
+bsmt.q<-ggplot(data =train, aes(x =reorder(Bsmt.Qual, SalePrice, median) , y =SalePrice, color= Bsmt.Qual)) +geom_boxplot(outlier.size=0.2)+
+  stat_summary(fun.data = number, geom = "text", fun.y = median)+
+  scale_y_continuous(name = "Price", labels = function(y) paste0(y / 1000, "k"))+ ggtitle("Basement Quality vs Price")+
+  scale_x_discrete(name="Basement Quality")
+
+bsmt.c<-ggplot(data =train, aes(x =reorder(Bsmt.Cond, SalePrice, median) , y =SalePrice, color= Bsmt.Cond)) +geom_boxplot(outlier.size=0.2)+
+  stat_summary(fun.data = number, geom = "text", fun.y = median)+
+  scale_y_continuous(name = "Price", labels = function(y) paste0(y / 1000, "k"))+ ggtitle("Basement Condition vs Price")+
+  scale_x_discrete(name="Basement Condition")
+
+gr.q<-ggplot(data =train, aes(x =reorder(Garage.Qual, SalePrice, median) , y =SalePrice, color= Garage.Qual)) +geom_boxplot(outlier.size=0.2)+
+  stat_summary(fun.data = number, geom = "text", fun.y = median)+
+  scale_y_continuous(name = "Price", labels = function(y) paste0(y / 1000, "k"))+ ggtitle("Garage Quality vs Price")+
+  scale_x_discrete(name="Garage Quality")
+
+gr.c<-ggplot(data =train, aes(x =reorder(Garage.Cond, SalePrice, median) , y =SalePrice, color=Garage.Cond)) +geom_boxplot(outlier.size=0.2)+
+  stat_summary(fun.data = number, geom = "text", fun.y = median)+
+  scale_y_continuous(name = "Price", labels = function(y) paste0(y / 1000, "k"))+ ggtitle("Garage Condition vs Price")+
+  scale_x_discrete(name="Garage Condition")
+
+fig8 <- ggarrange(ext.q, ext.c, bsmt.q, bsmt.c, gr.q, gr.c,
+                  ncol = 2, nrow = 3)
+print(fig8)
+```
+
+There´s definitely strong connection between `Exterior Quality` and `Basement Quality` vs `Sale Price`. The variables such as `Garage Quality`, `Basement Condition`, `Exterior condition` and `Garage Condition` are mostly represented by "TA" ("average") level and have very low variances. 
+
+* **Conclusion.**
+
+* As our response variable, `SalePrice`, is continuous, I will be implementing regression models. One assumption of linear regression models is that the error between the observed and expected values (i.e., the residuals) should be normally distributed. `SalePrice` has a right skew, so log transformation of the response variable should be considered since it results in its distribution being more "normal". 
+
+* Among numeric variables the most highly correlated to the `SalePrice` are `Gr.Liv.Area`, `Garage.Cars`, `Garage.Area`, `Year.Built`, `Full.Bath`, `Year.Remod.Add`, `X1st.Flr.SF`, `Fireplaces`, `TotRms.AbvGrd`. There are also signs of high correlations among some of the predictors. 
+
+* The three "year" variables: `Year.Built`, `Year.Remod.Add` and `Garage.Yr.Blt` that can´t be treated directly as quantitative variables and need further transformation. 
+
+* As a result of EDA I found out that this data set contains categorical variables that have extremely low variances, i.e. for most of the observations in data set there is only one level meaning that there is very little information in these variables because they mostly consist of a single level (e.g. "TA" in the cases of `Garage Quality`, `Garage Condition`. etc.).  
+
+* There are also factors that have levels with very few observations within the levels (e.g. "Landmark" level in the case of `Neighborhood`, etc.). These levels have minimal chance of making a real impact on model fit.  
+
+
+## 3. Handling missing values (full data set).
+
+```{r}
+data_full<-rbind(train, test)
+```
+
+```{r, echo=FALSE}
+data_full[data_full=="" | data_full==" "] <- NA
+
+
+NA_data_full <- data_full %>% 
+  select_if(function(x) any(is.na(x))) %>% 
+  summarise_all(funs(sum(is.na(.))))
+
+NA_data_full<-sort(NA_data_full, decreasing = TRUE)
+
+ggplot(,aes(x=as.integer(NA_data_full[1,]), y=variable.names(NA_data_full))) + 
+  geom_point(size=3, show.legend = TRUE, colour="orange") + 
+  ggtitle(label="MISSING VALUES IN FULL DATA SET")+ labs(x="the number of NAs", y="variables") +
+  theme(panel.grid.major.x = element_blank(),
+        panel.grid.minor.x = element_blank(),
+        panel.grid.major.y = element_line(colour="brown", linetype="dashed"))
+
+```
+
+According to [Dataset description file](https://github.com/poziryna84/Kschool_Final_Project/blob/master/DataSet_Description.RMD) `NA`	stands for "no feature" for 14 following variables:
+
+* **Pool.QC**
+* **Misc.Feature**
+* **Alley**
+* **Fence**
+* **Fireplace.Qu**
+* **Garage.Type**
+* **Garage.Qual**
+* **Garage.Finish**
+* **Garage.Cond**
+* **BsmtFin.Type.1**
+* **BsmtFin.Type.2**
+* **Bsmt.Qual**
+* **Bsmt.Cond**
+* **Bsmt.Exposure**
+
+In these cases `NA` will be set to "No_ftr" (no feature).
+
+```{r, echo=FALSE}
+NA_cols<-c("Pool.QC", "Misc.Feature", "Alley", "Fence", "Fireplace.Qu","Garage.Type", "Garage.Qual", 
+           "Garage.Finish","Garage.Cond", "BsmtFin.Type.1", "BsmtFin.Type.2","Bsmt.Qual",
+           "Bsmt.Cond","Bsmt.Exposure")
+
+data_full[NA_cols]<-lapply(data_full[,NA_cols], function(x) fct_explicit_na(x, na_level = "No_ftr"))
+```
+
+
+* **The rest of the `NAs`**   
+
+`LotFrontage` means the portion of a lot that abuts a public or private street. There are 490 NAs which will replaced with its median value.
+
+```{r, echo=FALSE}
+data_full$Lot.Frontage[is.na(data_full$Lot.Frontage)] <- median(data_full$Lot.Frontage, na.rm = TRUE)
+```
+
+Regarding the rest of the variables the number of NA is negligible (less than 0.5%) so I'll assume that NA are "None" and "SBrkr" (as most common cases) for `MasVnrType` and `Electrical` respectively; and 0 for numeric variables such as `MasVnrArea`, basement and garage variables.
+
+```{r, echo=FALSE}
+data_full$Mas.Vnr.Area[is.na(data_full$Mas.Vnr.Area)] <- 0
+data_full<-transform(data_full, Mas.Vnr.Type=fct_explicit_na(data_full$Mas.Vnr.Type, "None"))
+
+data_full$Total.Bsmt.SF[is.na(data_full$Total.Bsmt.SF)] <- 0
+data_full$Bsmt.Unf.SF[is.na(data_full$Bsmt.Unf.SF)] <- 0
+data_full$BsmtFin.SF.2[is.na(data_full$BsmtFin.SF.2)] <- 0
+data_full$BsmtFin.SF.1[is.na(data_full$BsmtFin.SF.1)] <- 0
+data_full$Bsmt.Half.Bath[is.na(data_full$Bsmt.Half.Bath)] <- 0
+data_full$Bsmt.Full.Bath[is.na(data_full$Bsmt.Full.Bath)] <- 0
+
+data_full$Garage.Cars[is.na(data_full$Garage.Cars)] <- 0
+data_full$Garage.Area[is.na(data_full$Garage.Area)] <- 0
+
+data_full$Garage.Yr.Blt[is.na(data_full$Garage.Yr.Blt)] <- 0
+
+data_full$Garage.Yr.Blt[(data_full$Garage.Yr.Blt>2010)] <-
+data_full[(data_full$Garage.Yr.Blt>2010),"Year.Remod.Add"]
+
+data_full<-transform(data_full, Electrical=fct_explicit_na(data_full$Electrical, "SBrkr"))
+```
+
+
+## 4. Feature engeneering part.
+
+## 4.1 Identifying and dropping unused factors levels.##
+
+Before dealing with level transformations I will identify and drop unused levels in the following categorical variables: 
+
+```{r, echo=FALSE}
+unused_levels<- function(dataset, number){
+  factor_var <- sapply(dataset, is.factor)
+  factor_df <-dataset[, factor_var]
+  factors<-c()
+  for (column in names(factor_df)){
+    
+    levels_ = table(factor_df[[column]])
+    levels_df = as.data.frame(levels_)
+    
+    if (min(levels_df$Freq)<=number){
+      factors<-append(factors,column,after = length(factors)) 
+      
+    }
+    
+  }
+  return(factors)
+}
+
+
+print(unused_levels(data_full, number=0))
+```
+
+
+```{r, echo=FALSE}
+data_full[unused_levels(data_full, number = 0)]<-lapply(data_full[,unused_levels(data_full, number = 0)], function(x) droplevels(x))    
+```
+
+##  4.2. Combining levels.
+
+To avoid redundant levels in categorical variables and to deal with rare levels I am going to combine them.
+
+* **Neighborhood levels combination**.
+
+To avoid having too many levels and/or too few cases within the `Neighborhood` levels I am going to combine them and create a new variable called `New_Neighborhood` by considering the average value of the `SalePrice` of each level.
+
+**Neighborhood levels**
+
+```{r, echo=FALSE}
+table(data_full$Neighborhood)
+```
+
+
+*Suggest_levels()* function from *regclass* package determines levels that are similar to each other in terms of their average value of `SalePrice`.
+
+The target number of 5 neighborhoods was identified after several iterations as it 
+allows us to have a decent number of cases within each level.
+
+```{r}
+f<-suggest_levels(SalePrice~Neighborhood,data=data_full,target=5,recode=TRUE)
+```
+
+The new levels are A, B, C , E as follows:
+
+```{r, echo=FALSE}
+f$Conversion2
+```
+
+```{r, echo=FALSE}
+data_full$New_Neighborhood<-f$newlevels
+```
+
+```{r, echo=FALSE, message =FALSE, warning=FALSE, fig.width = 11}
+new_neighb<-ggplot(data_full, aes(New_Neighborhood, fill=Neighborhood))+geom_histogram(stat="count")+ggtitle("New Neighborhoods")+xlab("New Neighborhood counts")+theme_bw()
+
+new_price_neigh<-ggplot(data = data_full, aes(x =reorder(New_Neighborhood, SalePrice, median) , y =SalePrice,color= New_Neighborhood)) +geom_boxplot(outlier.size=0.2)+stat_summary(fun.data = number, geom = "text", fun.y = median)+ 
+  scale_y_continuous(name = "Price", labels = function(y) paste0(y / 1000, "k"))+ ggtitle("The New Neighborhood vs Price")
+
+
+fig_neighb <- ggarrange(new_neighb, new_price_neigh,
+                        ncol = 2, nrow = 1)
+print(fig_neighb)
+table(data_full$New_Neighborhood)
+```
+
+`New_Neighbourhood` variable has been created with the minimum number of observations within its levels being 160.
+
+
+**Overall Condition and Overall Quality modifications.**
+
+Regarding overall condition and quality variables it also makes sense to combine similar levels but this time based on their orderings.
+
+**Overall Condition levels**
+
+```{r, echo=FALSE}
+table(data_full$Overall.Cond)
+```
+
+**Overall Quality levels**
+
+```{r, echo=FALSE}
+table(data_full$Overall.Qual)
+```
+
+
+`Overall.Qual` and `Overall.Qual` variable levels will be transformed as follows:
+
+* **10** *very Excellent*  as **exc** 
+* **9**	*excellent*        as **exc** 
+* **8**	*very good*        as **exc**
+* **7**	*good*             as **good**
+* **6**	*above average*    as **good**
+* **5**	*average*          as **avg**
+* **4**	*below average*    as **blw_avg**
+* **3**	*fair*             as **blw_avg**
+* **2**	*poor*             as **blw_avg**
+* **1**	*very poor*        as **blw_avg**
+
+```{r, echo=FALSE, message =FALSE, warning=FALSE}
+lev_reset<-function(vector){
+  levels(vector)<-list(blw_avg=c("1","2","3", "4"),avg="5",good=c("6", "7"), exc=c("8", "9", "10"))
+  vector
+}
+
+variables<-c("Overall.Qual", "Overall.Cond")
+
+data_full[variables]<-lapply(data_full[,variables], function(x) lev_reset(x))
+
+new_qual <- ggplot(data_full, aes(Overall.Qual, fill=Overall.Qual))+geom_histogram(stat="count")+ggtitle("Overall quality")+xlab("Rates of overall quality")+theme_bw()
+
+new_cond <- ggplot(data_full, aes(Overall.Cond, fill=Overall.Cond))+geom_histogram(stat="count")+ggtitle("Overall condition")+xlab("Rates of overall condition")+theme_bw()
+
+new_fig <- ggarrange(new_qual,new_cond, 
+                     ncol = 2, nrow = 2)
+
+print(new_fig)
+
+```
+
+* Modified `Overall.Cond`.
+
+```{r, echo=FALSE}
+table(data_full$Overall.Cond)
+```
+
+* Modified `Overall.Qual`.
+
+```{r, echo=FALSE}
+table(data_full$Overall.Qual)
+```
+
+We can observe more sensible distribution as a result of having fewer levels.
+
+
+**Other quality and condition variables levels combinations.**
+
+Since all the other quality and condition variables also have a clear ordering and share the same legend it makes sense to modify them together as shown below:
+
+* **Fa** *fair* and **Po** *poor*      as **blw_avg**
+* **TA** *avarage*                     as **avg**
+* **Ex** *excellent* and **Gd** *good* as **abv_avg**
+* **No_ftr**                           as **No_ftr**
+
+```{r, echo=FALSE, message =FALSE, warning=FALSE}
+fun1<-function(vector){
+  levels(vector)<-list(blw_avg=c("Fa","Po"),avg="TA",abv_avg=c("Ex", "Gd"), No_ftr=("No_ftr"))
+  vector
+}
+list<-c("Heating.QC", "Garage.Qual", "Garage.Cond", "Bsmt.Cond", "Kitchen.Qual", "Pool.QC", "Fireplace.Qu", "Exter.Qual", "Exter.Cond", "Bsmt.Qual")
+
+data_full[,list]<-lapply(data_full[,list], function(x) fun1(x))
+
+g_c<-ggplot(data_full, aes(Garage.Cond, fill=Garage.Cond))+geom_histogram(stat="count")
+g_q<-ggplot(data_full, aes(Garage.Qual, fill=Garage.Qual))+geom_histogram(stat="count")
+heat<-ggplot(data_full, aes(Heating.QC, fill=Heating.QC))+geom_histogram(stat="count")
+bsmt_cond<-ggplot(data_full, aes(Bsmt.Cond, fill=Bsmt.Cond))+geom_histogram(stat="count")
+kitch<-ggplot(data_full, aes(Kitchen.Qual, fill=Kitchen.Qual))+geom_histogram(stat="count")
+pool<-ggplot(data_full, aes(Pool.QC, fill=Pool.QC))+geom_histogram(stat="count")
+fpl<-ggplot(data_full, aes(Fireplace.Qu, fill=Fireplace.Qu))+geom_histogram(stat="count")
+extq<-ggplot(data_full, aes(Exter.Qual, fill=Exter.Qual))+geom_histogram(stat="count")
+extc<-ggplot(data_full, aes(Exter.Cond, fill=Exter.Cond))+geom_histogram(stat="count")
+bsmt_q<-ggplot(data_full, aes(Bsmt.Qual, fill=Bsmt.Qual))+geom_histogram(stat="count")
+
+figure8 <- ggarrange(g_c, g_q, heat, bsmt_cond, bsmt_q, kitch, pool, fpl, extq, extc,
+                     ncol = 3, nrow = 4,
+                     common.legend = TRUE, legend = "bottom")
+
+print(figure8)
+```
+
+Some variables such as `Pool.QC`, `Bsmt.Cond`, `Exter.Cond`, etc. have extremely low variances, but I will leave it to the feature selection and dimensionality reduction stages.
+
+
+* **The rest of the categorical variables.**
+
+To combine levels using their frequency, we first look at the frequency distribution of each level and reset the levels that have frequency of less than 5% of total observation into **"Other"** level. The variables to consider are:
+
+```{r, echo=FALSE, message =FALSE, warning=FALSE}
+
+lowvar_levels<- function(dataset, prct){
+  factor_var <- sapply(dataset, is.factor)
+  factor_df <-dataset[, factor_var]
+  factors<-c()
+  for (column in names(factor_df)){
+    
+    levels_ = table(factor_df[[column]])
+    levels_df = as.data.frame(levels_)
+    levels_df$perc<-100/nrow(factor_df)*levels_df$Freq
+    
+    if (min(levels_df$perc)<prct){
+      factors<-append(factors,column,after = length(factors)) 
+      
+    }
+  }
+  return(factors)
+}
+
+
+low.lev.var<-lowvar_levels(data_full, 5) 
+new_list<-low.lev.var[ !grepl( "Q" , low.lev.var, fixed = TRUE ) & !grepl( ".Cond" , low.lev.var, fixed = FALSE)
+                       & !grepl( "Neighborhood" , low.lev.var, fixed = TRUE )]
+print(new_list) 
+```
+
+
+```{r, echo=FALSE, message =FALSE, warning=FALSE}
+condenseMe <- function(vector, name, limit) {
+  
+  toCondense <- names(which(prop.table(table(vector)) < limit))
+  levels(vector)[levels(vector) %in% toCondense] <- name
+  
+  vector
+}
+
+data_full[new_list]<-lapply(data_full[,new_list], function(x) condenseMe(x, limit = 0.05, name = "Other"))
+
+```
+
+##  4.3. Creating new variables.
+
+Rather than using year variables I am going to use their modified versions such as the age of the house/garage and the period of time since it was last remodeled.
+
+```{r, echo=FALSE, message =FALSE, warning=FALSE}
+data_full$Garage.age<-sapply(data_full$Garage.Yr.Blt, function(x) {ifelse((x >0), 2011 - x,  0)})
+data_full$House.age <- sapply(data_full$Year.Built, function(x) 2011 - x)
+data_full$Remod.age <- sapply(data_full$Year.Remod.Add, function(x) 2011 - x)
+```
+
+New age variables are `House.age`, `Remod.age` and `Garage.age`.
+
+## 4.4. Final preparations for the modelling.
+  
+```{r, echo=FALSE, message =FALSE, warning=FALSE}
+set.seed(123)
+
+train <- subset(data_full, Order %in% train$Order)
+test <- subset(data_full, Order %in% test$Order)
+```
+
+
+```{r, echo=FALSE, message =FALSE, warning=FALSE}
+
+train<- train %>% filter(Sale.Condition == "Normal")
+test<- test %>% filter(Sale.Condition == "Normal")
+```
+
+```{r, echo=FALSE, message =FALSE, warning=FALSE}
+
+
+drops<-c("Year.Built", "Year.Remod.Add", "Garage.Yr.Blt", "Sale.Condition", "X1st.Flr.SF", 
+         "X2nd.Flr.SF", "Neighborhood","Mo.Sold", "Yr.Sold", "Order", "PID", "Sale.Type")
+
+train<-train[ , !(names(train) %in% drops)] 
+
+```
+
+* The full data set was divided into train and test sets again.
+
+* The train and the test sets were filtered for *Normal* `Sale.Condition` and a new variable `Log.Price` was added.
+
+* `Order`, `PID`, `Year.Built`, `Year.Remod.Add`, `Garage.Yr.Blt`, `Sale.Condition`, `X1st.Flr.SF`, `X2nd.Flr.SF`, `Neighborhood`,`Mo.Sold`, `Yr.Sold`, `Sale.Type`, `SalePrice` variables together with the outlier case were excluded from the train set.
+
+* To get some insights on the variables significance Boruta wrapper algorithm was performed which confirmed the first 52 attributes with the following weights as being important:
+
+```{r, echo=FALSE, message =FALSE, warning=FALSE,results='hide'}
+set.seed(123)
+
+boruta.train <- Boruta(SalePrice~., data = train, doTrace = 2)
+
+print(boruta.train)
+```
+
+```{r, echo=FALSE, message =FALSE, warning=FALSE, results='hide'}
+
+final.boruta <- TentativeRoughFix(boruta.train)
+
+
+lz<-lapply(1:ncol(final.boruta$ImpHistory),function(i)
+  final.boruta$ImpHistory[is.finite(final.boruta$ImpHistory[,i]),i])
+names(lz) <- colnames(final.boruta$ImpHistory)
+Labels <- sort(sapply(lz,median))
+plot(final.boruta, xlab = "", xaxt = "n")
+axis(side = 1,las=2,labels = names(Labels),
+     at = 1:ncol(final.boruta$ImpHistory), cex.axis = 0.7)
+
+```
+
+With the weight of 25 above grade (ground) living area `Gr.Liv.Area` has been identified as the most important one followed by the total square feet of basement area `Total.Bsmt.SF`, garage square feet `Garage.Area`, overall quality `Overall.Qual`, location `New_Neighborhood`, etc.
+
+**13 most important variables.**
+
+```{r, echo=FALSE, message =FALSE, warning=FALSE}
+f<-rev(names(Labels))
+
+imp.var<-f[1:13]
+print(imp.var)
+```
+
+# Creating Log.Price variable and filtering the outlier:
+
+```{r, echo=FALSE, message =FALSE, warning=FALSE}
+train$Log.Price <- log(train$SalePrice)
+train<-train[(train$Log.Price>9.48036750918924 ),]
+train<-train[ , !(names(train) %in% c("SalePrice"))] 
+```
+
+* Lastly dummy train and test sets were created with the following dimensions:
+  
+**Train set dimensions**
+
+```{r, echo=FALSE, message =FALSE, warning=FALSE}
+f<-dummyVars("~ .", data=train, fullRank = FALSE)
+train<- data.frame(predict(f, newdata=train))
+```
+
+**Test set dimensions**
+
+```{r, echo=FALSE, message =FALSE, warning=FALSE}
+foo<-dummyVars("~ .", data=test, fullRank = FALSE)
+test<- data.frame(predict(foo, newdata=test))
+```
+
+## 5. Modelling and predicting.
+
+Since predicting continuous values such as `SalePrice` in our case is purely a regression problem I am going to try fitting the following models:
+  
+  * **Linear Regression**
+  
+  * **Elastic-Net Regularized Linear Regression**
+  
+  * **Simple random forest**
+  
+  * **Gradient boosting**
+  
+  
+  While fitting the models I will be estimating how accurately they perform based on **RMSE** in practice using **10-fold cross-validation** and averaging out of sample error. That will be then repeated **5 times** to give more precise estimate of the true out of sample error. It will also produce exact same cross-validation folds for each model to make fair comparison. 
+
+To be able to fit the above listed models by specifying the **method** option and perform **cross validation** on them *caret package* will be used as it provides a common interface to various predictive models. 
+
+```{r, echo=FALSE, message =FALSE, warning=FALSE}
+set.seed(123)
+myControl <- trainControl(
+  method = "repeatedcv", number = 10,
+  repeats = 5,
+  verboseIter = TRUE
+)
+```
+
+* **Linear Regression model.**
+  
+  **Preprocessing steps.** 
+  
+Here centering and scaling has been performed so that the units of the regression coefficients are the same.
+
+Since there are low variance and correlated variables in the data set I am going to apply **PCA** and remove **zero and near zero variance predictors** in order to reduce dimensionality and create a single set of high variance, perpendicular (perfectly uncorrelated) predictors. 
+
+```{r, echo=FALSE, message =FALSE, warning=FALSE, results = 'hide'}
+set.seed(123)
+lm.model<-train(Log.Price~.,  data = train ,
+                method = "lm", 
+                trControl = myControl,
+                preProcess=c("zv", "nzv", "center", "scale", "pca"))
+
+
+```
+
+The **results** of the linear regression model are as follows:
+  
+```{r, echo=FALSE, message =FALSE, warning=FALSE}
+lm.model$preProcess
+lm.model$results
+
+```
+
+* **Elastic-Net Regularized Linear Regression model.**
+  
+  **Preprocessing steps.** 
+  
+Centering and scaling has been performed again so that the units of the regression coefficients are the same. 
+
+No PCA this time as elastic-net has built-in variable selection. As it is the combination of Ridge and Lasso, by tuning `alpha` and `lambda` hyperparameters it penalizes both the number of non-zero coefficients and absolute magnitude of coefficients which will help better handle collinearity in order to find a parsimonious model. 
+
+**Tuning grid.**
+  
+  For single value of alpha all values of lambda are fit simultaneously. This grid explores 10 `lambda` values, from 0.0001 to 0.01 and 20 `alpha` values between 0 and 1. I chose such low values of `lambda` because in this case higher values increase **RMSE**. 
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
+set.seed(123)
+net <-train(Log.Price~.,  data = train, 
+            method = "glmnet",
+            metric="RMSE",
+            tuneGrid= expand.grid(alpha = seq(0,1, length=20), 
+                                  lambda = seq(0.0001, 0.01, length = 10)),
+            trControl=myControl,preProcess=c("zv", "nzv", "center",
+                                             "scale"))
+```
+
+Based on the smallest mean of **RMSE** (0.1010849) value the optimal model was selected with hyperparameters of `alpha` = 0.2631579 and `lambda` = 0.0023.
+
+```{r, echo=FALSE, message =FALSE, warning=FALSE}
+print(plot(net))
+print(arrange(net$results, RMSE) %>% head(1))
+```
+
+* **Simple random forest model.**
+  
+ **Preprocessing steps.** 
+  
+No need to center and scale as Random Forests are based on tree partitioning algorithms and not on coefficients obtained in general regression strategies.
+
+The reason why I am going to use it is due to its robustness to correlated predictors and the ability to handle high-dimensional data without variable selection.
+
+Rather than using the classic random Forest package, I'll be using the *ranger package*, which is a re-implementation of random Forest and is said to be faster.
+
+**Tuning.**
+
+To explore a variety of potential models I initially set `tuneLength` to 10 and identified that the model that yields lowest **RMSE** of 0.1115673 has the number of variables selected at a node split (`mtry`) equal to 62 and follows *variance* splitting rule. 
+
+The **results** are as follows:
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
+set.seed(123)                            
+model_rf = train(Log.Price~.,  data = train,
+metric="RMSE",
+method = "ranger",
+tuneGrid= expand.grid(mtry = 62, splitrule = "variance",
+min.node.size = 5),
+trControl = myControl)
+
+```
+
+```{r, echo=FALSE, message =FALSE, warning=FALSE}
+model_rf$results
+```
+
+As fitting and tuning random forest model is quite time consuming hence only the final model with "the best" grid search was included in the project. 
+
+* **Gradient boosting model.**
+
+I am going to try to boost the accuracy of the random tree model by applying boosting algorithm that defines a loss function and minimizes it.
+
+
+**Preprocessing steps.** 
+
+Since gradient boosting is based on decision tree so there is no need to center and scale.
+
+**Tuning grid.**
+
+The optimal tuning grid that minimizes **RMSE** was set as follows:
+
+* the number of iterations, i.e. trees `n.trees` to 209-219; 
+
+* the complexity of the tree `interaction.depth` to 7; 
+
+* the learning rate or `shrinkage` to 0.1; 
+* the minimum number of training set samples in a node `n.minobsinnode` to 22
+ 
+**Tuning results:** 
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
+gbmTuningGrid = expand.grid(interaction.depth = c(7), 
+                            n.trees = c(209:219), 
+                            shrinkage = c(0.1),
+                            n.minobsinnode = c(22))
+
+set.seed(123)
+model_gbm = train(Log.Price~.,  data = train,
+                  metric = "RMSE",
+                  method = "gbm",
+                  trControl = myControl,
+                  tuneGrid=gbmTuningGrid,
+                  preProcess=c("zv", "nzv"))
+
+
+```
+
+```{r, echo=FALSE, message =FALSE, warning=FALSE}
+print(plot(model_gbm))
+print(arrange(model_gbm$results, RMSE) %>% head(1))
+```
+
+* **Comparing and choosing the model.**
+
+To assess which of the four models is the best for the given data set I am going to use 
+*resamples()* function. 
+
+```{r, echo=FALSE, message =FALSE, warning=FALSE}
+model_list <- list( LM_model =lm.model, Elastic_net_model = net, Random_f =model_rf,  GBM = model_gbm)
+resamples <- resamples(model_list)
+
+print(summary(resamples))
+
+print(bwplot(resamples, metric = "RMSE"))
+
+```
+
+As a result of regularization and boosting both **Elastic net** and ***GBM** models yield to better results. Based on the lowest median **RMSE** `Elastic_net_model` has been chosen as the final one.
+
+* **Predicting**
+  
+Predicting logged `SalePrice` on unseen data results in **RMSE** equal to  0.1024034 or $ 18100.87 which is higher than the median, but within the IQR of the performance statistics. 
+
+**Logged predictions RMSE**:
+
+```{r, echo=FALSE, message =FALSE, warning=FALSE}
+test$net_pred<- predict(net, test)
+test$error_net <- test$net_pred -log(test$SalePrice)
+RMSE_net<-sqrt(mean(test$error_net ^2))
+print(RMSE_net)
+
+```
+
+**Root-mean-square error in US dollars:**
+
+```{r, echo=FALSE, message =FALSE, warning=FALSE}
+test$exp_net<-exp(test$net_pred)
+test$error_net_exp <- test$exp_net - test$SalePrice
+RMSE_net_exp<-sqrt(mean(test$error_net_exp  ^2))
+print(RMSE_net_exp)
+
+```
+
+```{r, echo=FALSE, message =FALSE, warning=FALSE}
+net_fit<-ggplot(test, aes(x = exp_net, y = SalePrice)) + 
+  geom_point() +
+  ggtitle(label="Elastic Net Model Predictions vs Outcomes")+ 
+  scale_y_continuous(name = "Actual values",labels = function(y) paste0(y / 1000, "k"))+
+  scale_x_continuous(name = "Predictions",labels = function(x) paste0(x / 1000, "k"))+
+  geom_abline(color = "blue")
+print(net_fit)
+
+res_net_fit<-ggplot(test, aes(x = SalePrice  , y =error_net_exp)) + 
+  geom_point() +
+  ggtitle(label="Elastic Net Model Residuals vs Outcomes")+ 
+  scale_y_continuous(name = "Actual values",labels = function(y) paste0(y / 1000, "k"))+
+  scale_x_continuous(name = "Residuals",labels = function(x) paste0(x / 1000, "k"))
+ 
+print(res_net_fit)
+```
+
+The plots show that in some cases the model predicts values between $ 250000 and 450 000 less accurately than the rest. On the other hand the outliers have quite decent predictions. Even though this model can not be considered more than fair, it still does a much better job when compared with the baseline prediction.
+
+## Conclusions.
+
+As results of the project we have the model to predict housing prices in Iowa, Ames for the properties sold under normal sale conditions as well as the features that influence the price the most. 
+
+**The features in the order of importance:**
+
+* `Gr.Liv.Area`
+* `Total.Bsmt.SF`
+* `Garage.Area`       
+* `Overall.Qual`
+* `New_Neighborhood`  
+* `Lot.Area` 
+* `BsmtFin.SF.1` 
+* `Fireplace.Qu` 
+* `Fireplaces` 
+* `TotRms.AbvGrd`
+* `Garage.Cars`
+* `House.age` 
+* `Remod.age`
+
