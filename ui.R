@@ -13,6 +13,10 @@ if(!require('rsconnect')){
   library('rsconnect')
 }
 
+if(!require("ggplot2")){
+  install.packages("ggplot2")
+  library("ggplot2")
+}
 
 #?icon for more icons Font Awsome icon
 shinyUI(
