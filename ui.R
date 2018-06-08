@@ -47,7 +47,7 @@ shinyUI(
     dashboardBody(
       tabItems(
         tabItem(tabName = "age",
-                
+                h4("Construction history & Overall Prices vs. Area, Quality & Age features."),
                 fluidRow(
                   box( status = "primary", 
                       solidHeader = T,  plotOutput("distPlot"), background ="navy",   "There was a construction
@@ -64,7 +64,7 @@ shinyUI(
        
 
         tabItem(tabName = "neighb",
-                h1(),
+                h1("Neighborhoods in terms of median Sale Price"),
                 fluidRow( 
                   box( width = 10, status = "primary", solidHeader = T,  plotOutput("PlotN"), 
                        background ="navy",  "The least expensive neighborhood is Meadow with the 
@@ -76,7 +76,7 @@ shinyUI(
                   
                 )),
         tabItem(tabName = "sales",
-                h2("Housing Prices in realation to Area & Age characteristics by Neighborhood"),
+                h2("Housing Prices in realation to Area, Age & Quality characteristics by Neighborhood"),
                 fluidRow(
                   box( width = 3, selectInput("NeighbInput", "Neighborhood",
                                   c("Blmngtn", "Blueste", "BrDale",  "BrkSide", "ClearCr", 

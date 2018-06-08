@@ -8,4 +8,4 @@ Data set is called AmesHousing.csv.
 
 The details of the data set are in DataSet_Description.RMD
 
-Shiny Dashboard codes: server.R and ui.R.
+Shiny Dashboard codes: server.R and ui.R. The dashboard itself can be viewed on https://poziryna84.shinyapps.io/Kschool_Final_Project/
