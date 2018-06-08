@@ -5,9 +5,9 @@ account: poziryna84
 server: shinyapps.io
 hostUrl: https://api.shinyapps.io/v1
 appId: 357371
-bundleId: 1418842
+bundleId: 1419259
 url: https://poziryna84.shinyapps.io/Kschool_Final_Project/
-when: 1528463519.33135
+when: 1528474327.19945
 asMultiple: FALSE
 asStatic: FALSE
-ignoredFiles: .RData|AmesHousing.csv|Dashboard.txt|DataSet_Description.RMD|EDA.r|Memoria.txt|Methodology_and_plan.html|Methodology_and_plan.RMD|project.r|Rplots.pdf
+ignoredFiles: .RData|AmesHousing.csv|Dashboard.txt|DataSet_Description.RMD|EDA.r|Memoria.txt|Methodology_and_plan.html|Methodology_and_plan.RMD|project.r|Rplots.pdf|Presentation/app.R

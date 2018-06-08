@@ -34,7 +34,7 @@ train<- train %>% filter(Sale.Condition == "Normal")
 imp_data <- train[,c("SalePrice", "Gr.Liv.Area", "Total.Bsmt.SF", "Garage.Area", "Overall.Qual", "Neighborhood", "Lot.Area",    "BsmtFin.SF.1", "Fireplaces","TotRms.AbvGrd","Garage.Cars","House.age", "Remod.age", "Year.Built")]
 
 imp_data$SalePrice <-imp_data$SalePrice /1000
-imp_data$Overall.Qual <- as.factor(imp_data$Overall.Qual)
+
 
 dataset<- imp_data
 
@@ -44,7 +44,7 @@ shinyServer(function(input, output){
     
     
     hist(imp_data$Year.Built, col = "#75AADB", border = "white",xlab = "Years",
-         main = "Year Built", breaks = input$bins)
+         main = "Year Built", breaks = input$bin)
     
   })
     
@@ -53,8 +53,20 @@ shinyServer(function(input, output){
       filtered1 <-
         imp_data %>%
         filter(
-               Gr.Liv.Area >= input$Gr.Liv.Input[1],
-               Gr.Liv.Area <= input$Gr.Liv.Input[2])
+          Gr.Liv.Area >= input$Gr.Liv.Input[1],
+          Gr.Liv.Area <= input$Gr.Liv.Input[2],
+          House.age >= input$House.age.Input[1],
+          House.age <= input$House.age.Input[2],
+          Total.Bsmt.SF >= input$Total.Bsmt.SF.Input[1],
+          Total.Bsmt.SF <= input$Total.Bsmt.SF.Input[2],
+          Garage.Area >= input$Garage.Area.Input[1],
+          Garage.Area <= input$Garage.Area.Input[2],
+          Lot.Area >= input$Lot.Area.Input[1],
+          Lot.Area <= input$Lot.Area.Input[2],
+          TotRms.AbvGrd>= input$TotRms.AbvGrd.Input[1],
+          TotRms.AbvGrd <= input$TotRms.AbvGrd.Input[2],
+          Overall.Qual >= input$Overall.Qual.Input[1],
+          Overall.Qual <= input$Overall.Qual.Input[2])
 
        hist( filtered1$SalePrice,  col = "#75AADB", border = "white",xlab = "$000",
            main = "Housing Prices, Ames, Iowa", breaks = input$bin)
@@ -90,38 +102,19 @@ shinyServer(function(input, output){
                Lot.Area >= input$Lot.Area.Input[1],
                Lot.Area <= input$Lot.Area.Input[2],
                TotRms.AbvGrd>= input$TotRms.AbvGrd.Input[1],
-               TotRms.AbvGrd <= input$TotRms.AbvGrd.Input[2])
+               TotRms.AbvGrd <= input$TotRms.AbvGrd.Input[2],
+               Overall.Qual >= input$Overall.Qual.Input[1],
+               Overall.Qual <= input$Overall.Qual.Input[2])
+               
+
  
       hist(filtered$SalePrice,col = "#75AADB", border = "white", xlab = "SalePrice($000)",
-           main = "SalePrice by Neighborhood", breaks = input$buns)
+           main = "SalePrice by Neighborhood", breaks = input$bin)
 
       
       
     })
     
-    output$coolplotQ <- renderPlot({
-      filtered <-
-        imp_data %>%
-        filter(Overall.Qual == input$QualInput,
-               Gr.Liv.Area >= input$Gr.Liv.Input[1],
-               Gr.Liv.Area <= input$Gr.Liv.Input[2],
-               House.age >= input$House.age.Input[1],
-               House.age <= input$House.age.Input[2],
-               Total.Bsmt.SF >= input$Total.Bsmt.SF.Input[1],
-               Total.Bsmt.SF <= input$Total.Bsmt.SF.Input[2],
-               Garage.Area >= input$Garage.Area.Input[1],
-               Garage.Area <= input$Garage.Area.Input[2],
-               Lot.Area >= input$Lot.Area.Input[1],
-               Lot.Area <= input$Lot.Area.Input[2],
-               TotRms.AbvGrd>= input$TotRms.AbvGrd.Input[1],
-               TotRms.AbvGrd <= input$TotRms.AbvGrd.Input[2])
-      
-      hist(filtered$SalePrice,col = "#75AADB", border = "white", xlab = "SalePrice($000)",
-           main = "SalePrice vs Quality",  breaks = input$bun)
-      
-      
-      
-    })
     
     
    
